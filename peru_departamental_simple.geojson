@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PERU 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img
+          class="peru-flag"
+          src="./assets/peru-state-flag.svg"
+          alt="Bandera del Peru con escudo"
+          onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/commons/d/df/Flag_of_Peru_%28state%29.svg';"
+        />
+        <div>
+          <p class="eyebrow">Elecciones Generales - Primera Vuelta</p>
+          <h1>PERU 2026</h1>
+          <p>Dashboard electoral con conteo, proyeccion y disputa por segunda vuelta.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="shareBtn">Compartir</button>
+        <button id="refreshBtn" class="primary">Actualizar</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Vistas electorales">
+      <button class="tab active" type="button" data-tab="onpe">ONPE + Proyeccion</button>
+      <button class="tab" type="button" data-tab="analysis">Que esta pasando</button>
+      <button class="tab" type="button" data-tab="datum">DecidePeru Congreso</button>
+    </nav>
+
+    <main>
+      <div class="tab-panel active" data-tab-panel="onpe">
+      <section class="live-panel">
+        <div class="status">
+          <span class="pulse"></span>
+          <div>
+            <p class="eyebrow">ONPE - Actas contabilizadas</p>
+            <strong id="counted">93.740%</strong>
+          </div>
+        </div>
+        <div class="ticker">
+          <span>ONPE en vivo</span>
+          <span>Datum CR 100%</span>
+          <span>Ultima consulta: <b id="lastUpdate">--:--</b></span>
+          <span>Proximo refresh: <b id="countdown">5:00</b></span>
+          <span id="refreshStatus">Conectando...</span>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Resumen de actas">
+        <article>
+          <span>Actas pendientes</span>
+          <strong id="pendingActs">4,812</strong>
+          <small>Por contabilizar</small>
+        </article>
+        <article>
+          <span>Actas impugnadas</span>
+          <strong id="challengedActs">318</strong>
+          <small>JEE</small>
+        </article>
+        <article>
+          <span>Votos contabilizados</span>
+          <strong id="countedVotes">16.4 M</strong>
+          <small>ONPE parcial</small>
+        </article>
+        <article>
+          <span>Votos estimados restantes</span>
+          <strong id="remainingVotes">1.1 M</strong>
+          <small>Alta incidencia urbana</small>
+        </article>
+      </section>
+
+      <section class="refresh-health" id="refreshHealth" aria-label="Estado de actualizacion en vivo">
+        <article class="health-card health-main is-loading">
+          <span class="health-dot"></span>
+          <div>
+            <span>Fuente en vivo</span>
+            <strong>Conectando</strong>
+          </div>
+        </article>
+        <article class="health-card">
+          <span>Ultima consulta</span>
+          <strong>--</strong>
+        </article>
+        <article class="health-card">
+          <span>Data recibida</span>
+          <strong>--</strong>
+        </article>
+        <article class="health-card">
+          <span>Cambio</span>
+          <strong>Esperando</strong>
+        </article>
+      </section>
+
+      <section id="candidateCards" class="kpis candidate-kpis" aria-label="Resultados por candidato"></section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Segunda vuelta</p>
+              <h2>Probabilidad de pase</h2>
+            </div>
+            <span>Segun brecha y avance ONPE</span>
+          </div>
+          <div id="probabilityList" class="probability-list"></div>
+          <div id="totalVotesPrediction" class="total-votes-prediction"></div>
+        </article>
+
+        <article class="panel map-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Mapa</p>
+              <h2>Mapa interactivo del Peru</h2>
+            </div>
+            <span>Toca una region para ver votos</span>
+          </div>
+          <div class="peru-map" id="peruMap" aria-label="Mapa interactivo del Peru por regiones"></div>
+        </article>
+      </section>
+
+      <section class="grid chart-table">
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Tabla</p>
+              <h2>Proyeccion ONPE</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>Candidato</th>
+                  <th>ONPE</th>
+                  <th>Proy.</th>
+                  <th>Delta</th>
+                  <th>Ventaja</th>
+                </tr>
+              </thead>
+              <tbody id="projectionRows"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="sources">
+        <article>
+          <p class="eyebrow">Fuente</p>
+          <h2>Datum CR 100%</h2>
+          <div id="sourceCards" class="source-cards"></div>
+        </article>
+      </section>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="analysis">
+        <section class="panel public-summary analysis-hero">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Lectura profunda</p>
+              <h2>Que esta pasando</h2>
+            </div>
+            <button id="resetFocus" type="button">Ver todo</button>
+          </div>
+          <p id="publicSummary">El dashboard se actualiza con datos publicos. Haz clic en un candidato o departamento para explorar.</p>
+          <div id="analysisDeepDive" class="analysis-deep-dive"></div>
+          <div id="selectedCandidatePanel" class="selected-panel"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Candidatos</p>
+              <h2>Donde pueden sacar mas votos</h2>
+            </div>
+            <span>Estimado por actas pendientes</span>
+          </div>
+          <div id="analysisCandidatePotential" class="analysis-potential-grid"></div>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="datum">
+        <section class="panel congress-intro">
+          <div>
+            <p class="eyebrow">DecidePeru - Congreso</p>
+            <h2>Senadores y diputados</h2>
+            <p>Senado nacional y Camara de Diputados con curules por partido y lectura publica de la composicion posible.</p>
+            <div class="congress-links">
+              <button id="refreshCongressBtn" type="button">Actualizar Congreso</button>
+            </div>
+          </div>
+          <div class="congress-kpis">
+            <article>
+              <span>Senado</span>
+              <strong id="senateTotalSeats">60</strong>
+              <small>curules totales</small>
+            </article>
+            <article>
+              <span>Diputados</span>
+              <strong id="deputyTotalSeats">130</strong>
+              <small>curules por circunscripcion</small>
+            </article>
+            <article>
+              <span>Fuente</span>
+              <strong id="congressSourceStatus">Conectando</strong>
+              <small id="congressUpdatedAt">DecidePeru</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="grid congress-grid">
+          <article class="panel congress-panel">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Senado</p>
+                <h2>Curules asignadas</h2>
+              </div>
+              <span>60 curules</span>
+            </div>
+            <div id="senateHemicycle" class="congress-hemicycle"></div>
+            <div id="senateRows" class="congress-list"></div>
+          </article>
+
+          <article class="panel congress-panel">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Diputados</p>
+                <h2>Curules asignadas</h2>
+              </div>
+              <span>130 curules</span>
+            </div>
+            <div id="deputyHemicycle" class="congress-hemicycle"></div>
+            <div id="deputyRows" class="congress-list"></div>
+          </article>
+        </section>
+
+        <section class="panel congress-note">
+          <p class="eyebrow">Fuente y metodo</p>
+          <p id="congressMethodNote">Se consulta DecidePeru solo para senadores y diputados. La vista presidencial de esta pagina sigue usando ONPE.</p>
+        </section>
+      </div>
+
+    </main>
+
+    <footer>
+      <span>Elaborado como proyecto academico - Fuente: ONPE, Datum Internacional, DecidePeru - abril 2026</span>
+      <button id="donateBtn" aria-label="Yapear" title="Yapear">Y</button>
+    </footer>
+
+    <dialog id="shareDialog">
+      <button class="close" data-close="shareDialog">x</button>
+      <h2>Compartir dashboard</h2>
+      <p>Comparte los resultados electorales en vivo.</p>
+      <div class="share-grid">
+        <button id="shareWhatsApp">WhatsApp</button>
+        <button id="shareX">X</button>
+        <button id="shareFacebook">Facebook</button>
+        <button id="shareTelegram">Telegram</button>
+        <button id="copyBtn">Copiar link</button>
+      </div>
+    </dialog>
+
+    <dialog id="donateDialog">
+      <button class="close" data-close="donateDialog">x</button>
+      <div class="yape-mark">Y</div>
+      <h2>Yapear</h2>
+      <p>Si te gusto este proyecto, cualquier donacion es voluntaria.</p>
+      <div class="qr">QR</div>
+      <dl>
+        <dt>Nombre</dt>
+        <dd>Tu nombre aqui</dd>
+        <dt>Celular</dt>
+        <dd>999 999 999</dd>
+      </dl>
+    </dialog>
+
+    <dialog id="regionDialog">
+      <button class="close" data-close="regionDialog">x</button>
+      <div id="regionDialogContent"></div>
+    </dialog>
+
+    <dialog id="candidateDialog">
+      <button class="close" data-close="candidateDialog">x</button>
+      <div id="candidateDialogContent"></div>
+    </dialog>
+
+    <dialog id="senatorDialog">
+      <button class="close" data-close="senatorDialog">x</button>
+      <div id="senatorDialogContent"></div>
+    </dialog>
+
+    <script src="script.js"></script>
+  </body>
+</html>

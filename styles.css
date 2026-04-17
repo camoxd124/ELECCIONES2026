@@ -1,0 +1,3280 @@
+const WORKER_URL = "https://onpe-proxy.renzonunez-af.workers.dev";
+const ONPE_IMG_BASE = "https://resultadoelectoral.onpe.gob.pe/assets/img-reales/candidatos/";
+const PERU_GEOJSON_URL = "https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_departamental_simple.geojson";
+const PUBLIC_SHARE_URL = "";
+const DECIDEPERU_BASE_URL = "https://dwin6afrwpy9h.cloudfront.net/";
+const DECIDEPERU_CURRENT_URL = `${DECIDEPERU_BASE_URL}publish/_current.json`;
+const DECIDEPERU_PROXY_URL = "https://api.codetabs.com/v1/proxy/?quest=";
+const DECIDEPERU_PARTY_URLS = [
+  "https://decideperu.com/api/partidos_congresales.json",
+  "https://decideperu.com/api/partidos.json",
+];
+const VOTE_BASE_STORAGE_KEY = "peruElige2026VoteBaseV1";
+
+const candidates = [
+  { key: "fuji", trackingKey: "fujimori", name: "Fujimori", onpe: 16.8, projected: 16.9, votes: 2750000, probability: 99, color: "#e8943a", img: "10001088" },
+  { key: "rla", trackingKey: "rla", name: "Lopez Aliaga", short: "L. Aliaga", onpe: 12.6, projected: 12.9, votes: 2110000, probability: 67, color: "#4a90d9", img: "07845838" },
+  { key: "nieto", trackingKey: "nieto", name: "Nieto", onpe: 11.8, projected: 11.6, votes: 1940000, probability: 45, color: "#2ecda7", img: "06506278" },
+  { key: "belm", trackingKey: "belmont", name: "Belmont", onpe: 10.0, projected: 10.1, votes: 1660000, probability: 21, color: "#b07cd8", img: "09177250" },
+  { key: "sanch", trackingKey: "sanchez", name: "Sanchez", onpe: 9.6, projected: 9.4, votes: 1540000, probability: 12, color: "#e04848", img: "16002918" },
+];
+
+const fallbackCongressParties = [
+  { raw: "AHORA NACION - AN", party: "Ahora Nacion", sigla: "AN", color: "#6A1B9A" },
+  { raw: "FUERZA POPULAR", party: "Fuerza Popular", sigla: "FP", color: "#FF6600" },
+  { raw: "JUNTOS POR EL PERU", party: "Juntos por el Peru", sigla: "JPP", color: "#D32F2F" },
+  { raw: "PARTIDO CIVICO OBRAS", party: "Partido Civico Obras", sigla: "PCO", color: "#E3B93C" },
+  { raw: "PARTIDO DEL BUEN GOBIERNO", party: "Partido del Buen Gobierno", sigla: "PBG", color: "#2E7D32" },
+  { raw: "RENOVACION POPULAR", party: "Renovacion Popular", sigla: "RP", color: "#1a237e" },
+  { raw: "ALIANZA PARA EL PROGRESO", party: "Alianza para el Progreso", sigla: "APP", color: "#00BCD4" },
+  { raw: "AVANZA PAIS - PARTIDO DE INTEGRACION SOCIAL", party: "Avanza Pais", sigla: "AP", color: "#0D47A1" },
+  { raw: "PARTIDO POLITICO NACIONAL PERU LIBRE", party: "Peru Libre", sigla: "PL", color: "#B71C1C" },
+  { raw: "PODEMOS PERU", party: "Podemos Peru", sigla: "PP", color: "#00897B" },
+];
+
+const departments = [
+  "Amazonas", "Ancash", "Apurimac", "Arequipa", "Ayacucho",
+  "Cajamarca", "Callao", "Cusco", "Huancavelica", "Huanuco",
+  "Ica", "Junin", "La Libertad", "Lambayeque", "Lima",
+  "Loreto", "Madre de Dios", "Moquegua", "Pasco", "Piura",
+  "Puno", "San Martin", "Tacna", "Tumbes", "Ucayali",
+];
+
+const congressDepartments = {
+  AMAZONAS: { code: "01", name: "Amazonas" },
+  ANCASH: { code: "02", name: "Ancash" },
+  APURIMAC: { code: "03", name: "Apurimac" },
+  AREQUIPA: { code: "04", name: "Arequipa" },
+  AYACUCHO: { code: "05", name: "Ayacucho" },
+  CAJAMARCA: { code: "06", name: "Cajamarca" },
+  CALLAO: { code: "07", name: "Callao" },
+  CUSCO: { code: "08", name: "Cusco" },
+  HUANCAVELICA: { code: "09", name: "Huancavelica" },
+  HUANUCO: { code: "10", name: "Huanuco" },
+  ICA: { code: "11", name: "Ica" },
+  JUNIN: { code: "12", name: "Junin" },
+  "LA LIBERTAD": { code: "13", name: "La Libertad" },
+  LAMBAYEQUE: { code: "14", name: "Lambayeque" },
+  LIMA: { code: "15", name: "Lima" },
+  "LIMA METROPOLITANA": { code: "15", name: "Lima Metropolitana" },
+  "LIMA PROVINCIAS": { code: "15", name: "Lima Provincias" },
+  LORETO: { code: "16", name: "Loreto" },
+  "MADRE DE DIOS": { code: "17", name: "Madre de Dios" },
+  MOQUEGUA: { code: "18", name: "Moquegua" },
+  PASCO: { code: "19", name: "Pasco" },
+  PIURA: { code: "20", name: "Piura" },
+  PUNO: { code: "21", name: "Puno" },
+  "SAN MARTIN": { code: "22", name: "San Martin" },
+  TACNA: { code: "23", name: "Tacna" },
+  TUMBES: { code: "24", name: "Tumbes" },
+  UCAYALI: { code: "25", name: "Ucayali" },
+};
+
+const regionShapes = [
+  { name: "Tumbes", points: "46,18 85,24 86,58 54,66 30,45" },
+  { name: "Piura", points: "50,64 102,58 118,104 94,142 48,130 28,92" },
+  { name: "Lambayeque", points: "78,140 120,126 132,164 100,190 68,174" },
+  { name: "La Libertad", points: "88,188 138,168 158,216 128,260 82,240 66,210" },
+  { name: "Ancash", points: "100,250 154,226 174,276 145,328 96,314 76,278" },
+  { name: "Lima", points: "108,322 160,306 180,354 148,414 104,392 86,350" },
+  { name: "Callao", points: "84,348 102,344 104,364 86,368" },
+  { name: "Ica", points: "116,402 158,414 168,474 130,502 98,454" },
+  { name: "Arequipa", points: "136,488 198,466 224,520 192,576 134,548 112,512" },
+  { name: "Moquegua", points: "196,560 232,534 260,570 236,606 196,598" },
+  { name: "Tacna", points: "230,604 262,576 300,604 280,636 234,634" },
+  { name: "Cajamarca", points: "118,106 162,92 184,142 154,184 118,164 104,128" },
+  { name: "Amazonas", points: "154,62 212,48 238,104 204,156 166,136 142,96" },
+  { name: "Loreto", points: "216,36 328,38 350,158 320,252 242,234 206,158 238,104" },
+  { name: "San Martin", points: "170,162 216,150 244,230 204,276 162,236 146,194" },
+  { name: "Huanuco", points: "154,244 204,282 196,332 152,354 128,308" },
+  { name: "Pasco", points: "194,318 238,310 248,358 214,392 178,356" },
+  { name: "Junin", points: "150,356 210,394 208,456 162,474 138,416" },
+  { name: "Huancavelica", points: "126,404 164,476 142,520 104,486 98,436" },
+  { name: "Ayacucho", points: "166,456 218,464 230,520 194,556 144,520" },
+  { name: "Apurimac", points: "212,442 250,458 248,508 220,526 204,484" },
+  { name: "Cusco", points: "238,392 298,400 318,472 264,526 232,506 226,444" },
+  { name: "Madre de Dios", points: "286,330 356,340 362,428 318,474 296,402 250,382" },
+  { name: "Ucayali", points: "214,236 298,252 304,342 244,362 204,318 202,276" },
+  { name: "Puno", points: "256,512 322,474 346,554 306,636 252,604 226,548" },
+];
+
+let trends = [
+  [15.8, 16.1, 16.3, 16.6, 16.8, 16.9],
+  [11.1, 11.4, 11.9, 12.3, 12.6, 12.9],
+  [12.4, 12.2, 12.0, 11.9, 11.8, 11.6],
+  [9.8, 9.9, 10.1, 10.1, 10.0, 10.1],
+  [10.5, 10.2, 9.9, 9.7, 9.6, 9.4],
+];
+
+let liveRegions = [];
+let selectedCandidateKey = null;
+let selectedCandidateDialogKey = "";
+let selectedRegionName = "";
+let latestSnapshotTimestamp = null;
+let latestNationalPct = Number.parseFloat(document.querySelector("#counted")?.textContent) || 0;
+let latestCountedVotes = 0;
+let latestEstimatedRemainingVotes = 0;
+let latestProjectionModel = null;
+let hasVoteDeltaBaseline = false;
+let voteDeltaClearTimer = null;
+let hasAnimatedTotal = false;
+let totalPercentAnimation = null;
+let forceTotalFromZero = false;
+let peruGeoJson = null;
+let peruGeoJsonLoading = false;
+let peruGeoJsonFailed = false;
+let selectedCongressPartySigla = "";
+let congressPartyLookup = new Map();
+let congressFallbackRegistered = false;
+let congressPartyLookupLoaded = false;
+let congressState = {
+  error: "",
+  isLoading: false,
+  loaded: false,
+  proxyUsed: false,
+  senateElects: new Map(),
+  source: "DecidePeru",
+  status: "pending",
+  updatedAt: null,
+  lastFetchAt: null,
+  senate: {
+    groups: [],
+    raw: [],
+    stats: null,
+    totalSeats: 60,
+    totalVotes: 0,
+  },
+  deputies: {
+    groups: [],
+    raw: [],
+    stats: null,
+    totalSeats: 130,
+    totalVotes: 0,
+  },
+};
+let refreshHealthState = {
+  state: "loading",
+  startedAt: null,
+  completedAt: null,
+  durationMs: null,
+  dataTimestamp: null,
+  dataChanged: null,
+  voteDeltaTotal: 0,
+  cumulativeVoteDelta: 0,
+  totalCountedVotes: 0,
+  hadVoteBaseline: false,
+  signature: "",
+  error: "",
+};
+
+const formatter = new Intl.NumberFormat("es-PE");
+const JEE_CONSERVATIVE_WEIGHT = 0.45;
+
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function parsePoints(points) {
+  return points.split(" ").map((point) => point.split(",").map(Number));
+}
+
+function centroidX(points) {
+  const parsed = parsePoints(points);
+  return parsed.reduce((sum, point) => sum + point[0], 0) / parsed.length;
+}
+
+function centroidY(points) {
+  const parsed = parsePoints(points);
+  return parsed.reduce((sum, point) => sum + point[1], 0) / parsed.length;
+}
+
+function polygonCentroid(points) {
+  if (!points.length) return { x: 0, y: 0, area: 0 };
+
+  let areaTwice = 0;
+  let centerX = 0;
+  let centerY = 0;
+
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    const cross = point[0] * next[1] - next[0] * point[1];
+    areaTwice += cross;
+    centerX += (point[0] + next[0]) * cross;
+    centerY += (point[1] + next[1]) * cross;
+  });
+
+  if (Math.abs(areaTwice) < 0.001) {
+    return {
+      x: points.reduce((sum, point) => sum + point[0], 0) / points.length,
+      y: points.reduce((sum, point) => sum + point[1], 0) / points.length,
+      area: 0,
+    };
+  }
+
+  return {
+    x: centerX / (3 * areaTwice),
+    y: centerY / (3 * areaTwice),
+    area: Math.abs(areaTwice) / 2,
+  };
+}
+
+function shapeCenter(points) {
+  const center = polygonCentroid(parsePoints(points));
+  return [center.x, center.y];
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function toTitleCase(value) {
+  return String(value || "").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function shortenRegionLabel(value) {
+  return String(value || "")
+    .replace("Madre de Dios", "M. de Dios")
+    .replace("La Libertad", "La Libertad")
+    .replace("Huancavelica", "Huancav.")
+    .replace("Lambayeque", "Lambay.");
+}
+
+function shouldShowMapLabel(value) {
+  return Boolean(value);
+}
+
+const mapLabelTweaks = {
+  [normalizeText("Callao")]: { dx: -42, dy: -2, size: 8.2 },
+  [normalizeText("Lima")]: { dx: 18, dy: -4, size: 8.4 },
+  [normalizeText("Tumbes")]: { dx: 2, dy: -3, size: 7.6 },
+  [normalizeText("Lambayeque")]: { label: "Lamb.", dx: -8, dy: -3, size: 7.2 },
+  [normalizeText("La Libertad")]: { lines: ["La", "Libertad"], dx: 2, dy: 0, size: 7.8 },
+  [normalizeText("Ancash")]: { dx: 4, dy: 1, size: 8.2 },
+  [normalizeText("Ica")]: { dx: -2, dy: 2, size: 8.4 },
+  [normalizeText("Moquegua")]: { label: "Moq.", dx: -10, dy: 0, size: 7.1 },
+  [normalizeText("Tacna")]: { dx: 8, dy: 6, size: 7.8 },
+  [normalizeText("Pasco")]: { dx: 7, dy: -4, size: 7.3 },
+  [normalizeText("Huancavelica")]: { label: "Huancav.", dx: -2, dy: 0, size: 7.1 },
+  [normalizeText("Madre de Dios")]: { lines: ["M. de", "Dios"], dx: 0, dy: 0, size: 8 },
+  [normalizeText("San Martin")]: { lines: ["San", "Martin"], dx: 0, dy: 0, size: 8 },
+};
+
+function getMapLabelConfig(regionName) {
+  const tweak = mapLabelTweaks[normalizeText(regionName)] || {};
+  const label = tweak.label || shortenRegionLabel(regionName);
+  const lines = tweak.lines || (label.includes(" ") ? label.split(" ") : [label]);
+  const longestLine = Math.max(...lines.map((line) => line.length));
+  const size = tweak.size || (longestLine > 10 ? 7.6 : longestLine > 8 ? 8.2 : 8.8);
+
+  return {
+    dx: tweak.dx || 0,
+    dy: tweak.dy || 0,
+    lineHeight: tweak.lineHeight || size + 2,
+    lines,
+    size,
+  };
+}
+
+function renderMapLabel(regionName, x, y, className = "", valueText = "") {
+  if (!valueText) return "";
+
+  const config = getMapLabelConfig(regionName);
+  const valueSize = Math.max(9.4, config.size + 1.4);
+  const valueClass = className ? ` ${className.trim()}` : "";
+
+  return `
+    <text class="region-value${valueClass}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" style="font-size:${valueSize.toFixed(1)}px">${escapeHtml(valueText)}</text>
+  `;
+}
+
+function renderSmallRegionMarker(regionName, x, y) {
+  if (normalizeText(regionName) !== normalizeText("Callao")) return "";
+
+  return `
+    <circle class="small-region-pin" cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="5"></circle>
+    <circle class="small-region-hit" cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="18"></circle>
+  `;
+}
+
+function getRegionalCandidates(region) {
+  if (!region) return [];
+  return candidates
+    .map((candidate) => ({
+      ...candidate,
+      pct: Number(region[candidate.key] || 0),
+      regionalVotes: Number(region[`${candidate.key}_v`] || 0),
+    }))
+    .sort((a, b) => b.pct - a.pct);
+}
+
+function getRegionSummary(region) {
+  const regionalCandidates = getRegionalCandidates(region);
+  const winner = regionalCandidates[0] || candidates[0];
+  const runnerUp = regionalCandidates[1] || candidates[1] || winner;
+  return {
+    regionalCandidates,
+    winner,
+    runnerUp,
+    gap: Math.max(0, winner.pct - runnerUp.pct),
+    voteGap: Math.max(0, winner.regionalVotes - runnerUp.regionalVotes),
+  };
+}
+
+function renderMapLegend() {
+  const activeCandidate = getCandidate(selectedCandidateKey);
+  const activeText = activeCandidate
+    ? `Mapa sombreado por ${activeCandidate.name}`
+    : "Color principal: candidato ganador en cada region";
+
+  const candidateButtons = candidates
+    .map((candidate) => {
+      const active = selectedCandidateKey === candidate.key ? " active" : "";
+      return `
+        <button class="map-legend-chip${active}" type="button" data-map-candidate="${candidate.key}">
+          <span style="background:${candidate.color}"></span>${candidate.short || candidate.name}
+        </button>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="map-legend" aria-label="Controles del mapa">
+      <p>${activeText}</p>
+      <div>
+        <button class="map-legend-chip${selectedCandidateKey ? "" : " active"}" type="button" data-map-candidate="winner">
+          <span class="winner-dot"></span>Ganador
+        </button>
+        ${candidateButtons}
+      </div>
+    </div>
+  `;
+}
+
+function geometryRings(geometry) {
+  if (!geometry) return [];
+  if (geometry.type === "Polygon") return geometry.coordinates;
+  if (geometry.type === "MultiPolygon") return geometry.coordinates.flat();
+  return [];
+}
+
+function geoBounds(features) {
+  const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  features.forEach((feature) => {
+    geometryRings(feature.geometry).forEach((ring) => {
+      ring.forEach(([lon, lat]) => {
+        bounds.minX = Math.min(bounds.minX, lon);
+        bounds.maxX = Math.max(bounds.maxX, lon);
+        bounds.minY = Math.min(bounds.minY, lat);
+        bounds.maxY = Math.max(bounds.maxY, lat);
+      });
+    });
+  });
+  return bounds;
+}
+
+function createGeoProjection(features, width, height, padding) {
+  const bounds = geoBounds(features);
+  const geoWidth = bounds.maxX - bounds.minX;
+  const geoHeight = bounds.maxY - bounds.minY;
+  const scale = Math.min((width - padding * 2) / geoWidth, (height - padding * 2) / geoHeight);
+  const mapWidth = geoWidth * scale;
+  const mapHeight = geoHeight * scale;
+  const offsetX = (width - mapWidth) / 2;
+  const offsetY = (height - mapHeight) / 2;
+
+  return ([lon, lat]) => [
+    offsetX + (lon - bounds.minX) * scale,
+    offsetY + (bounds.maxY - lat) * scale,
+  ];
+}
+
+function featurePath(feature, project) {
+  return geometryRings(feature.geometry)
+    .map((ring) => ring
+      .map((point, index) => {
+        const [x, y] = project(point);
+        return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(" ") + " Z")
+    .join(" ");
+}
+
+function featureCenter(feature, project) {
+  const centers = geometryRings(feature.geometry)
+    .map((ring) => polygonCentroid(ring.map(project)))
+    .filter((center) => Number.isFinite(center.x) && Number.isFinite(center.y))
+    .sort((a, b) => b.area - a.area);
+
+  if (centers.length) return [centers[0].x, centers[0].y];
+
+  const points = geometryRings(feature.geometry).flat().map(project);
+  const center = polygonCentroid(points);
+  return [center.x, center.y];
+}
+
+async function loadPeruGeoJson() {
+  if (peruGeoJson || peruGeoJsonLoading || peruGeoJsonFailed) return;
+  peruGeoJsonLoading = true;
+
+  async function getJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`GeoJSON HTTP ${response.status}`);
+    return response.json();
+  }
+
+  try {
+    try {
+      peruGeoJson = await getJson("peru_departamental_simple.geojson");
+    } catch {
+      peruGeoJson = await getJson(PERU_GEOJSON_URL);
+    }
+    renderMap();
+  } catch (error) {
+    console.warn("No se pudo cargar el mapa real. Usando mapa de respaldo.", error);
+    peruGeoJsonFailed = true;
+    renderFallbackMap();
+  } finally {
+    peruGeoJsonLoading = false;
+  }
+}
+
+function getCandidate(key) {
+  return candidates.find((candidate) => candidate.key === key);
+}
+
+function getRegion(name) {
+  return liveRegions.find((region) => normalizeText(region.name) === normalizeText(name));
+}
+
+function getRankedCandidates() {
+  return [...candidates].sort((a, b) => b.onpe - a.onpe);
+}
+
+function getProjectedRankedCandidates() {
+  return [...candidates].sort((a, b) => (b.projectedVotes || b.votes || 0) - (a.projectedVotes || a.votes || 0));
+}
+
+function getCandidateVoteGap(candidateKey) {
+  const ranked = [...candidates].sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
+  const index = ranked.findIndex((candidate) => candidate.key === candidateKey);
+  const candidate = ranked[index];
+  if (!candidate) {
+    return {
+      above: null,
+      below: null,
+    };
+  }
+
+  const candidateVotes = Number(candidate.votes || 0);
+  const above = ranked[index - 1];
+  const below = ranked[index + 1];
+
+  return {
+    above: above
+      ? {
+          candidate: above,
+          votes: Math.max(0, Number(above.votes || 0) - candidateVotes),
+        }
+      : null,
+    below: below
+      ? {
+          candidate: below,
+          votes: Math.max(0, candidateVotes - Number(below.votes || 0)),
+        }
+      : null,
+  };
+}
+
+function getCandidateGapSummary(candidateKey) {
+  const gap = getCandidateVoteGap(candidateKey);
+  if (gap.above) {
+    return `A ${formatter.format(Math.round(gap.above.votes))} de ${gap.above.candidate.short || gap.above.candidate.name}`;
+  }
+  if (gap.below) {
+    return `Ventaja ${formatter.format(Math.round(gap.below.votes))} sobre ${gap.below.candidate.short || gap.below.candidate.name}`;
+  }
+  return "Sin brecha disponible";
+}
+
+function clampProgress(value) {
+  const progress = Number(value || 0) / 100;
+  return Math.max(0, Math.min(1, progress));
+}
+
+function estimateValidVotesFromCandidates(percentField = "onpe") {
+  const estimates = candidates
+    .map((candidate) => {
+      const pct = Number(candidate[percentField] || candidate.onpe || 0) / 100;
+      const votes = Number(candidate.votes || 0);
+      return pct > 0 && votes > 0 ? votes / pct : 0;
+    })
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+
+  if (!estimates.length) return 0;
+  return estimates[Math.floor(estimates.length / 2)];
+}
+
+function buildVoteProjection(nationalPct, nationalValidVotes = 0, nationalStats = {}) {
+  const projectedByCandidate = Object.fromEntries(candidates.map((candidate) => [candidate.key, 0]));
+  const nationalProgress = clampProgress(nationalPct);
+  const nationalCurrentValidVotes = Number(nationalValidVotes || 0);
+  const fullProjectedValidVotes = nationalProgress && nationalCurrentValidVotes
+    ? nationalCurrentValidVotes / nationalProgress
+    : 0;
+  const totalActs = Number(nationalStats.totalActas || 0);
+  const countedActs = Number(nationalStats.contabilizadas || 0);
+  const jeeActs = Number(nationalStats.enviadasJee || 0);
+  const pendingActs = Math.max(
+    0,
+    Number(nationalStats.pendientesJee ?? (totalActs - countedActs - jeeActs))
+  );
+  const validVotesPerAct = countedActs && nationalCurrentValidVotes
+    ? nationalCurrentValidVotes / countedActs
+    : 0;
+  const conservativeRemainingActs = pendingActs + (jeeActs * JEE_CONSERVATIVE_WEIGHT);
+  const conservativeProjectedValidVotes = validVotesPerAct
+    ? nationalCurrentValidVotes + (conservativeRemainingActs * validVotesPerAct)
+    : 0;
+  const targetProjectedValidVotes = conservativeProjectedValidVotes || fullProjectedValidVotes;
+  let currentValidVotes = nationalCurrentValidVotes;
+  let projectedValidVotes = 0;
+  let regionsUsed = 0;
+  let projectionSource = "regional";
+
+  liveRegions.forEach((region) => {
+    const progress = clampProgress(region.pct);
+    const validVotes = Number(region.vv || 0);
+    if (!progress || !validVotes) return;
+
+    if (!nationalCurrentValidVotes) currentValidVotes += validVotes;
+    projectedValidVotes += validVotes / progress;
+    regionsUsed += 1;
+
+    candidates.forEach((candidate) => {
+      const regionVotes = Number(region[`${candidate.key}_v`] || 0);
+      const regionPct = Number(region[candidate.key] || 0);
+      const projectedVotes = regionVotes
+        ? regionVotes / progress
+        : (regionPct / 100) * (validVotes / progress);
+      projectedByCandidate[candidate.key] += projectedVotes;
+    });
+  });
+
+  if (regionsUsed && projectedValidVotes > 0 && targetProjectedValidVotes > 0) {
+    const nationalScale = targetProjectedValidVotes / projectedValidVotes;
+    candidates.forEach((candidate) => {
+      projectedByCandidate[candidate.key] *= nationalScale;
+    });
+    projectedValidVotes = targetProjectedValidVotes;
+    projectionSource = conservativeProjectedValidVotes ? "conservative-regional" : "national-regional";
+  }
+
+  if (!regionsUsed || projectedValidVotes <= 0) {
+    const impliedProjectedValidVotes = estimateValidVotesFromCandidates("onpe");
+    const baseValidVotes = nationalCurrentValidVotes || (nationalProgress ? impliedProjectedValidVotes * nationalProgress : impliedProjectedValidVotes);
+    currentValidVotes = baseValidVotes;
+    projectedValidVotes = targetProjectedValidVotes || impliedProjectedValidVotes || (nationalProgress ? baseValidVotes / nationalProgress : baseValidVotes);
+    projectionSource = conservativeProjectedValidVotes ? "conservative" : fullProjectedValidVotes ? "national" : "candidate";
+    const voteScale = currentValidVotes && projectedValidVotes
+      ? projectedValidVotes / currentValidVotes
+      : nationalProgress
+        ? 1 / nationalProgress
+        : 1;
+    candidates.forEach((candidate) => {
+      const candidateVotes = Number(candidate.votes || 0);
+      projectedByCandidate[candidate.key] = candidateVotes * voteScale;
+    });
+  }
+
+  return {
+    currentValidVotes,
+    fullProjectedValidVotes,
+    projectedByCandidate,
+    projectedValidVotes,
+    remainingValidVotes: Math.max(0, projectedValidVotes - currentValidVotes),
+    jeeActs,
+    jeeWeight: JEE_CONSERVATIVE_WEIGHT,
+    pendingActs,
+    projectionSource,
+    regionsUsed,
+  };
+}
+
+function getShareText() {
+  const ranked = getProjectedRankedCandidates();
+  const top = ranked[0];
+  const second = ranked[1];
+  const third = ranked[2];
+  const gap = second && third ? (second.projected - third.projected).toFixed(3) : "0.000";
+  return `Peru Elige 2026: ${top.name} lidera la proyeccion con ${top.projected.toFixed(3)}%. Segunda vuelta: ${second.name} ${second.projected.toFixed(3)}%, ${third.name} ${third.projected.toFixed(3)}%. Brecha: ${gap} pp.`;
+}
+
+function cleanShareUrl(value) {
+  try {
+    const url = new URL(value, location.href);
+    url.hash = "";
+    url.search = "";
+    if (url.pathname.endsWith("/index.html")) {
+      url.pathname = url.pathname.replace(/index\.html$/, "");
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+function getShareUrl() {
+  const configuredUrl = PUBLIC_SHARE_URL.trim();
+  if (configuredUrl) return cleanShareUrl(configuredUrl);
+
+  const canonicalUrl = document.querySelector('link[rel="canonical"]')?.href || "";
+  if (canonicalUrl && !canonicalUrl.startsWith("file:")) return cleanShareUrl(canonicalUrl);
+
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    return cleanShareUrl(location.href);
+  }
+
+  return "https://TU-USUARIO.github.io/elecciones-2026/";
+}
+
+function openShareWindow(url) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function assignPassProbabilities(nationalPct) {
+  const contenders = candidates.filter((candidate) => candidate.key !== "fuji");
+  if (!contenders.length) return;
+
+  const progress = Math.max(0, Math.min(100, Number(nationalPct || 0))) / 100;
+  const uncertainty = Math.max(0.34, 2.2 - progress * 1.82);
+  const leaderPct = Math.max(...contenders.map((candidate) => candidate.projected));
+  const weights = contenders.map((candidate) => ({
+    candidate,
+    weight: Math.exp((candidate.projected - leaderPct) / uncertainty),
+  }));
+  const totalWeight = weights.reduce((sum, item) => sum + item.weight, 0) || 1;
+
+  let roundedTotal = 0;
+  weights.forEach((item, index) => {
+    const raw = (item.weight / totalWeight) * 100;
+    const rounded = index === weights.length - 1
+      ? Math.max(0, 100 - roundedTotal)
+      : Math.max(0, Math.min(100 - roundedTotal, Math.round(raw)));
+    item.candidate.probability = rounded;
+    roundedTotal += rounded;
+  });
+
+  const first = candidates.find((candidate) => candidate.key === "fuji");
+  if (first) first.probability = 100;
+}
+
+function setStatus(message, className = "") {
+  const status = document.querySelector("#refreshStatus");
+  if (!status) return;
+  status.className = className;
+  status.textContent = message;
+}
+
+function buildSnapshotSignature(snapshot) {
+  const national = snapshot?.national || {};
+  const candidateData = national.candidates || {};
+  const nationalParts = [
+    national.pct,
+    national.contabilizadas,
+    national.enviadasJee,
+    national.pendientesJee,
+    national.votosValidos,
+    national.votosEmitidos,
+    ...candidates.flatMap((candidate) => [
+      candidate.key,
+      candidateData[candidate.key],
+      candidateData[`${candidate.key}_v`],
+    ]),
+  ];
+  const regionParts = (snapshot?.regions || []).map((region) => [
+    region.name,
+    region.pct,
+    region.vv,
+    region.contabilizadas,
+    region.enviadasJee,
+  ].join(":"));
+  return [...nationalParts, ...regionParts].join("|");
+}
+
+function getSnapshotTotalCountedVotes(snapshot) {
+  const national = snapshot?.national || {};
+  return Number(national.votosEmitidos || national.votosValidos || 0);
+}
+
+function getSnapshotVoteBase(snapshot, signature = "") {
+  const national = snapshot?.national || {};
+  const candidateData = national.candidates || {};
+  const candidateVotes = {};
+  candidates.forEach((candidate) => {
+    candidateVotes[candidate.key] = Number(
+      candidateData[`${candidate.key}_v`] ||
+        national.candidateVotes?.[candidate.key] ||
+        0
+    );
+  });
+
+  return {
+    candidateVotes,
+    cumulativeCandidateDeltas: {},
+    cumulativeVoteDelta: 0,
+    signature,
+    timestamp: national.fechaActualizacion || snapshot?.timestamp || Date.now(),
+    totalCountedVotes: getSnapshotTotalCountedVotes(snapshot),
+  };
+}
+
+function readStoredVoteBase() {
+  try {
+    const raw = window.localStorage?.getItem(VOTE_BASE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredVoteBase(base) {
+  try {
+    window.localStorage?.setItem(VOTE_BASE_STORAGE_KEY, JSON.stringify(base));
+  } catch {
+    // Storage can be blocked in some browser modes; live refresh still works.
+  }
+}
+
+function formatAge(value) {
+  if (!value) return "--";
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "--";
+
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return `hace ${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `hace ${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours}h`;
+
+  return `hace ${Math.floor(hours / 24)}d`;
+}
+
+function renderRefreshHealth() {
+  const root = document.querySelector("#refreshHealth");
+  if (!root) return;
+
+  const state = refreshHealthState.state;
+  const stateText = state === "ok"
+    ? "Conectado"
+    : state === "error"
+      ? "Sin respuesta"
+      : "Consultando";
+  const stateClass = state === "ok" ? "is-ok" : state === "error" ? "is-error" : "is-loading";
+  const lastConsult = refreshHealthState.completedAt
+    ? `${formatTime(refreshHealthState.completedAt)} - ${formatAge(refreshHealthState.completedAt)}`
+    : refreshHealthState.startedAt
+      ? "En curso"
+      : "--";
+  const dataReceived = refreshHealthState.dataTimestamp
+    ? `${formatTime(refreshHealthState.dataTimestamp)} - ${formatAge(refreshHealthState.dataTimestamp)}`
+    : "--";
+  const latency = refreshHealthState.durationMs
+    ? `${Math.round(refreshHealthState.durationMs)} ms`
+    : "--";
+  const voteDeltaTotal = Number(refreshHealthState.voteDeltaTotal || 0);
+  const cumulativeVoteDelta = Number(refreshHealthState.cumulativeVoteDelta || 0);
+  const changeText = refreshHealthState.dataChanged === null
+    ? "Esperando"
+    : `+${formatter.format(Math.round(cumulativeVoteDelta))} votos`;
+  const changeDetail = refreshHealthState.dataChanged === null
+    ? "Aun no hay comparacion"
+    : refreshHealthState.hadVoteBaseline
+      ? `Acumulado desde la base. Ultima actualizacion +${formatter.format(Math.round(voteDeltaTotal))} votos`
+      : "Primera consulta: base creada para comparar";
+  const detail = state === "error"
+    ? (refreshHealthState.error || "No se pudo consultar la fuente")
+    : `Worker ONPE - ${latency}`;
+
+  root.innerHTML = `
+    <article class="health-card health-main ${stateClass}">
+      <span class="health-dot"></span>
+      <div>
+        <span>Fuente en vivo</span>
+        <strong>${stateText}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </div>
+    </article>
+    <article class="health-card">
+      <span>Ultima consulta</span>
+      <strong>${escapeHtml(lastConsult)}</strong>
+    </article>
+    <article class="health-card">
+      <span>Data recibida</span>
+      <strong>${escapeHtml(dataReceived)}</strong>
+    </article>
+    <article class="health-card">
+      <span>Cambio</span>
+      <strong>${escapeHtml(changeText)}</strong>
+      <small>${escapeHtml(changeDetail)}</small>
+    </article>
+  `;
+}
+
+function renderCandidateCards() {
+  const root = document.querySelector("#candidateCards");
+  if (!root) return;
+  root.innerHTML = candidates
+    .map((candidate) => {
+      const votes = candidate.votes ? formatter.format(candidate.votes) : "-";
+      const label = candidate.short || candidate.name;
+      const selected = selectedCandidateKey === candidate.key ? " selected" : "";
+      const rank = candidates.findIndex((item) => item.key === candidate.key) + 1;
+      const projected = Number(candidate.projected || candidate.onpe || 0);
+      const barWidth = Math.min(100, Math.max(0, candidate.onpe * 4.6));
+      const voteDelta = Number(candidate.voteDelta || 0);
+      const gapSummary = getCandidateGapSummary(candidate.key);
+      const deltaBadge = voteDelta > 0
+        ? `<span class="vote-delta-badge" aria-label="${formatter.format(voteDelta)} votos nuevos">+${formatter.format(voteDelta)}</span>`
+        : "";
+      return `
+        <article class="kpi-card${selected}" data-candidate="${candidate.key}" tabindex="0" style="--candidate-color:${candidate.color}">
+          <div class="kpi-header">
+            <div class="kpi-person">
+              <span class="kpi-avatar kpi-avatar-fallback">${label[0]}</span>
+              <img class="kpi-avatar" src="${ONPE_IMG_BASE}${candidate.img}.jpg" alt="${candidate.name}" loading="lazy" onerror="this.style.display='none'; this.previousElementSibling.style.display='grid';" />
+              <div>
+                <span class="kpi-label">${label}</span>
+                <small>${rank}&deg; lugar</small>
+              </div>
+            </div>
+            <div class="kpi-alerts">
+              ${deltaBadge}
+              <span class="kpi-rank">#${rank}</span>
+            </div>
+          </div>
+          <div class="kpi-score">
+            <strong class="kpi-value">${candidate.onpe.toFixed(3)}%</strong>
+            <span>${votes} votos</span>
+          </div>
+          <div class="kpi-progress" aria-hidden="true">
+            <span style="width:${barWidth.toFixed(2)}%"></span>
+          </div>
+          <div class="kpi-foot">
+            <span>Proy. ${projected.toFixed(3)}%</span>
+            <span>${candidate.probability || 0}% pase</span>
+          </div>
+          <div class="kpi-gap">${escapeHtml(gapSummary)}</div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderProbabilities() {
+  const root = document.querySelector("#probabilityList");
+  if (root) {
+    root.innerHTML = candidates
+      .filter((candidate) => candidate.key !== "fuji")
+      .sort((a, b) => b.probability - a.probability)
+      .map(
+        (candidate) => `
+          <div class="candidate-row">
+            <div class="candidate-meta">
+              <strong>${candidate.name}</strong>
+              <span>${candidate.probability}%</span>
+            </div>
+            <div class="bar">
+              <span style="width: ${candidate.probability}%; background: ${candidate.color}"></span>
+            </div>
+          </div>
+        `
+      )
+      .join("");
+  }
+}
+
+function renderTotalVotesPrediction() {
+  const root = document.querySelector("#totalVotesPrediction");
+  if (!root) return;
+
+  const progress = clampProgress(latestNationalPct);
+  const model = latestProjectionModel || buildVoteProjection(latestNationalPct, latestCountedVotes);
+  const countedVotes = model.currentValidVotes || latestCountedVotes || candidates.reduce((sum, candidate) => sum + Number(candidate.votes || 0), 0);
+  const estimatedTotal = model.projectedValidVotes || countedVotes;
+  const remainingVotes = Math.max(0, model.remainingValidVotes || estimatedTotal - countedVotes);
+  const countedLabel = latestNationalPct ? `${latestNationalPct.toFixed(3)}%` : "--";
+  const fullTotal = model.fullProjectedValidVotes || estimatedTotal;
+  const jeeLabel = model.jeeActs ? `${Math.round((model.jeeWeight || 0) * 100)}% JEE` : "Sin JEE";
+  const baseLabel = model.projectionSource === "conservative-regional"
+    ? `Prudente + ${model.regionsUsed} regiones`
+    : model.projectionSource === "conservative"
+      ? "Prudente nacional"
+      : model.projectionSource === "national-regional"
+    ? `Nacional + ${model.regionsUsed} regiones`
+    : model.projectionSource === "national"
+      ? "Nacional"
+      : model.regionsUsed
+        ? `${model.regionsUsed} regiones`
+        : `${progress > 0 ? (1 / progress).toFixed(3) : "--"}x`;
+  const projectedRows = getProjectedRankedCandidates()
+    .map((candidate) => {
+      const currentVotes = Number(candidate.votes || 0);
+      const projectedVotes = Number(candidate.projectedVotes || model.projectedByCandidate?.[candidate.key] || currentVotes);
+      return {
+        ...candidate,
+        currentVotes,
+        projectedVotes,
+        additionalVotes: Math.max(0, projectedVotes - currentVotes),
+      };
+    });
+
+  root.innerHTML = `
+    <div class="total-votes-card">
+      <div class="prediction-head">
+        <div>
+          <p class="eyebrow">Prediccion</p>
+          <h3>Votos proyectados prudentes</h3>
+        </div>
+        <span class="prediction-status stable">${countedLabel} contado</span>
+      </div>
+
+      <div class="total-vote-hero">
+        <span>Votos validos estimados</span>
+        <strong>${formatter.format(Math.round(estimatedTotal))}</strong>
+        <small>Escenario conservador: pendientes completos y JEE ponderado</small>
+      </div>
+
+      <div class="prediction-grid">
+        <div>
+          <span>Validos contabilizados</span>
+          <strong>${formatter.format(Math.round(countedVotes))}</strong>
+        </div>
+        <div>
+          <span>Restantes estimados</span>
+          <strong>${formatter.format(Math.round(remainingVotes))}</strong>
+        </div>
+        <div>
+          <span>Avance ONPE</span>
+          <strong>${countedLabel}</strong>
+        </div>
+        <div>
+          <span>Base</span>
+          <strong>${baseLabel}</strong>
+        </div>
+        <div>
+          <span>Techo 100%</span>
+          <strong>${formatter.format(Math.round(fullTotal))}</strong>
+        </div>
+        <div>
+          <span>Ponderacion</span>
+          <strong>${jeeLabel}</strong>
+        </div>
+      </div>
+
+      <div class="total-vote-list">
+        ${projectedRows.map((candidate) => `
+          <div class="total-vote-row" style="--row-color:${candidate.color}">
+            <div>
+              <strong>${candidate.name}</strong>
+              <span>${formatter.format(Math.round(candidate.currentVotes))} ahora</span>
+            </div>
+            <div>
+              <strong>${formatter.format(Math.round(candidate.projectedVotes))}</strong>
+              <span>${candidate.projected.toFixed(3)}% proy. / +${formatter.format(Math.round(candidate.additionalVotes))}</span>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      <p class="prediction-note">Recalculado en modo prudente: se proyectan todas las actas pendientes, pero las actas enviadas al JEE se ponderan al ${Math.round(JEE_CONSERVATIVE_WEIGHT * 100)}% para evitar inflar los votos esperados. El techo 100% queda como referencia.</p>
+    </div>
+  `;
+}
+
+function renderFallbackMap() {
+  const root = document.querySelector("#peruMap");
+  if (!root) return;
+  const shapes = regionShapes
+    .map((shape, index) => {
+      const region = getRegion(shape.name);
+      const winnerKey = region ? candidates.reduce((winner, candidate) => {
+        return (region[candidate.key] || 0) > (region[winner.key] || 0) ? candidate : winner;
+      }, candidates[0]).key : null;
+      const candidate = winnerKey
+        ? candidates.find((item) => item.key === winnerKey)
+        : candidates[(index * 3 + 1) % candidates.length];
+      const focusedValue = selectedCandidateKey && region ? Number(region[selectedCandidateKey] || 0) : null;
+      const selected = normalizeText(selectedRegionName) === normalizeText(shape.name) ? " selected" : "";
+      const opacity = focusedValue === null ? 1 : (0.34 + Math.min(focusedValue, 45) / 45 * 0.66).toFixed(2);
+      const title = focusedValue === null
+        ? `${shape.name}: ${candidate.name}`
+        : `${shape.name}: ${focusedValue.toFixed(2)}% para ${getCandidate(selectedCandidateKey)?.name}`;
+      const labelQuiet = !shouldShowMapLabel(shape.name) && !selected ? " region-label-quiet" : "";
+      const [shapeLabelX, shapeLabelY] = shapeCenter(shape.points);
+      const labelX = shape.labelX || shapeLabelX;
+      const labelY = shape.labelY || shapeLabelY;
+      const valueText = focusedValue === null
+        ? (region?.pct ? `${Number(region.pct).toFixed(1)}%` : "")
+        : `${focusedValue.toFixed(1)}%`;
+      return `
+        <g class="map-region${selected}" data-region="${shape.name}" tabindex="0" role="button" aria-label="${escapeHtml(title)}" style="--region-color:${candidate.color}; opacity:${opacity}">
+          <polygon class="region-shape" points="${shape.points}">
+            <title>${title}</title>
+          </polygon>
+          ${renderSmallRegionMarker(shape.name, labelX, labelY)}
+          ${renderMapLabel(shape.name, labelX, labelY, labelQuiet, valueText)}
+        </g>
+      `;
+    })
+    .join("");
+
+  root.innerHTML = `
+    <div class="map-stage">
+      <svg class="peru-svg-map fallback-map" viewBox="12 8 360 628" role="img" aria-label="Mapa interactivo del Peru por region">
+        <g>${shapes}</g>
+      </svg>
+      <div class="map-tooltip" id="mapTooltip"></div>
+    </div>
+    ${renderMapLegend()}
+  `;
+}
+
+function renderMap() {
+  const root = document.querySelector("#peruMap");
+  if (!root) return;
+
+  if (peruGeoJsonFailed) {
+    renderFallbackMap();
+    return;
+  }
+
+  if (!peruGeoJson) {
+    root.innerHTML = `
+      <div class="real-map-loading">
+        <strong>Cargando mapa real del Peru</strong>
+        <span>Usando limites departamentales GeoJSON.</span>
+      </div>
+    `;
+    loadPeruGeoJson();
+    return;
+  }
+
+  const features = peruGeoJson.features || [];
+  const width = 560;
+  const height = 790;
+  const project = createGeoProjection(features, width, height, 6);
+  const extraRegions = liveRegions.filter((region) => {
+    return !features.some((feature) => normalizeText(feature.properties?.NOMBDEP) === normalizeText(region.name));
+  });
+
+  const paths = features.map((feature, index) => {
+    const rawName = feature.properties?.NOMBDEP || "";
+    const region = getRegion(rawName);
+    const displayName = region?.name || toTitleCase(rawName);
+    const winnerKey = region ? candidates.reduce((winner, candidate) => {
+      return (region[candidate.key] || 0) > (region[winner.key] || 0) ? candidate : winner;
+    }, candidates[0]).key : null;
+    const candidate = winnerKey
+      ? candidates.find((item) => item.key === winnerKey)
+      : candidates[(index * 3 + 1) % candidates.length];
+    const focusedValue = selectedCandidateKey && region ? Number(region[selectedCandidateKey] || 0) : null;
+    const selected = normalizeText(selectedRegionName) === normalizeText(displayName) ? " selected" : "";
+    const opacity = focusedValue === null ? 1 : (0.34 + Math.min(focusedValue, 45) / 45 * 0.66).toFixed(2);
+    const [labelX, labelY] = featureCenter(feature, project);
+    const title = focusedValue === null
+      ? `${displayName}: ${candidate.name}`
+      : `${displayName}: ${focusedValue.toFixed(2)}% para ${getCandidate(selectedCandidateKey)?.name}`;
+    const labelQuiet = !shouldShowMapLabel(displayName) && !selected ? " region-label-quiet" : "";
+    const valueText = focusedValue === null
+      ? (region?.pct ? `${Number(region.pct).toFixed(1)}%` : "")
+      : `${focusedValue.toFixed(1)}%`;
+
+    return `
+      <g class="map-region${selected}" data-region="${escapeHtml(displayName)}" tabindex="0" role="button" aria-label="${escapeHtml(title)}" style="--region-color:${candidate.color}; opacity:${opacity}">
+        <path class="region-shape" d="${featurePath(feature, project)}">
+          <title>${escapeHtml(title)}</title>
+        </path>
+        ${renderSmallRegionMarker(displayName, labelX, labelY)}
+        ${renderMapLabel(displayName, labelX, labelY, labelQuiet, valueText)}
+      </g>
+    `;
+  }).join("");
+
+  const extras = extraRegions.length ? `
+    <div class="map-extra-regions">
+      ${extraRegions.map((region) => `<button type="button" data-region="${escapeHtml(region.name)}">${escapeHtml(region.name)}</button>`).join("")}
+    </div>
+  ` : "";
+
+  root.innerHTML = `
+    <div class="map-stage">
+      <svg class="peru-svg-map real-peru-map" viewBox="0 0 ${width} ${height}" role="img" aria-label="Mapa real interactivo del Peru por regiones">
+        <g>${paths}</g>
+      </svg>
+      <div class="map-tooltip" id="mapTooltip"></div>
+    </div>
+    ${renderMapLegend()}
+    ${extras}
+  `;
+}
+
+function renderTable() {
+  const rows = document.querySelector("#projectionRows");
+  rows.innerHTML = candidates
+    .map((candidate, index) => {
+      const delta = candidate.projected - candidate.onpe;
+      const next = candidates[index + 1];
+      const advantage = next ? `+${(candidate.projected - next.projected).toFixed(3)} pts` : "-";
+      return `
+        <tr>
+          <td>${index + 1}&deg;</td>
+          <td><strong>${candidate.name}</strong></td>
+          <td>${candidate.onpe.toFixed(3)}%</td>
+          <td>${candidate.projected.toFixed(3)}%</td>
+          <td>${delta >= 0 ? "+" : ""}${delta.toFixed(3)}</td>
+          <td>${advantage}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function allocateSeats(rows, totalSeats) {
+  const totalPct = rows.reduce((sum, row) => sum + Number(row.pct || 0), 0);
+  const allocation = rows.map((row) => {
+    const quota = totalPct ? (Number(row.pct || 0) / totalPct) * totalSeats : 0;
+    return {
+      ...row,
+      seats: Math.floor(quota),
+      remainder: quota - Math.floor(quota),
+    };
+  });
+  let assignedSeats = allocation.reduce((sum, row) => sum + row.seats, 0);
+  allocation
+    .sort((a, b) => b.remainder - a.remainder)
+    .forEach((row) => {
+      if (assignedSeats >= totalSeats) return;
+      row.seats += 1;
+      assignedSeats += 1;
+    });
+  return allocation.sort((a, b) => b.seats - a.seats || b.pct - a.pct);
+}
+
+function renderCongressList(rootId, totalSeats, label) {
+  const root = document.querySelector(`#${rootId}`);
+  if (!root) return;
+
+  const allocated = allocateSeats(congressPreference, totalSeats);
+  const maxPct = Math.max(...allocated.map((row) => row.pct), 1);
+  const openPct = congressOpenVote.reduce((sum, item) => sum + item.pct, 0);
+
+  root.innerHTML = `
+    ${allocated.map((row, index) => `
+      <div class="congress-row" style="--party-color:${row.color}">
+        <div class="congress-row-head">
+          <div>
+            <span class="congress-rank">${index + 1}</span>
+            <strong>${escapeHtml(row.party)}</strong>
+          </div>
+          <strong>${row.seats}</strong>
+        </div>
+        <div class="congress-bar">
+          <span style="width:${Math.max(5, (row.pct / maxPct) * 100).toFixed(2)}%"></span>
+        </div>
+        <div class="congress-row-foot">
+          <span>${row.pct.toFixed(1)}% preferencia</span>
+          <span>${label}</span>
+        </div>
+      </div>
+    `).join("")}
+
+    <div class="congress-undecided">
+      <strong>${openPct.toFixed(1)}% sin voto congresal definido</strong>
+      <span>${congressOpenVote.map((item) => `${item.label}: ${item.pct.toFixed(1)}%`).join(" · ")}</span>
+    </div>
+  `;
+}
+
+function renderCongressDashboard() {
+  renderCongressList("senateRows", 60, "curules senado");
+  renderCongressList("deputyRows", 130, "curules diputados");
+}
+
+function normalizeCongressName(value) {
+  return normalizeText(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function makeCongressSigla(value) {
+  const text = String(value || "").trim().toUpperCase();
+  const suffix = text.match(/(?:^|\s|-)([A-Z]{2,6})$/);
+  if (suffix) return suffix[1];
+  const words = text.replace(/[^A-Z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const skip = new Set(["DE", "DEL", "LA", "LAS", "LOS", "EL", "Y", "POR", "PARA"]);
+  const initials = words.filter((word) => !skip.has(word)).map((word) => word[0]).join("");
+  return (initials || text.replace(/[^A-Z0-9]/g, "")).slice(0, 5) || "PART";
+}
+
+function registerCongressParty(party) {
+  if (!party) return;
+  const info = {
+    party: party.party || party.nombre || party.raw || "Partido",
+    sigla: party.sigla || makeCongressSigla(party.raw || party.nombre || party.party),
+    color: party.color || "#6b7280",
+    logoUrl: party.logoUrl || "",
+  };
+  [party.raw, party.nombre_onpe, party.nombre, party.party, party.sigla, info.sigla]
+    .filter(Boolean)
+    .forEach((key) => {
+      congressPartyLookup.set(normalizeCongressName(key), info);
+    });
+}
+
+function ensureCongressFallbackParties() {
+  if (congressFallbackRegistered) return;
+  fallbackCongressParties.forEach(registerCongressParty);
+  congressFallbackRegistered = true;
+}
+
+function getCongressPartyInfo(rawName) {
+  ensureCongressFallbackParties();
+  const found = congressPartyLookup.get(normalizeCongressName(rawName));
+  if (found) return found;
+  return {
+    party: toTitleCase(String(rawName || "Partido").replace(/\s+-\s+[A-Z0-9]+$/, "")),
+    sigla: makeCongressSigla(rawName),
+    color: "#6b7280",
+    logoUrl: "",
+  };
+}
+
+function getCongressDepartment(rawName) {
+  const normalized = normalizeCongressName(String(rawName || "").replaceAll("_", " ")).toUpperCase();
+  const key = normalized.replace(/[^A-Z0-9]+/g, " ").trim();
+  return congressDepartments[key] || {
+    code: "",
+    name: toTitleCase(String(rawName || "").replaceAll("_", " ")),
+  };
+}
+
+function congressUrl(pathOrUrl) {
+  if (!pathOrUrl) return "";
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return `${DECIDEPERU_BASE_URL}${String(pathOrUrl).replace(/^\/+/, "")}`;
+}
+
+function withCacheBust(url) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}_t=${Date.now()}`;
+}
+
+async function fetchCongressJson(pathOrUrl, { allowProxy = true } = {}) {
+  const directUrl = withCacheBust(congressUrl(pathOrUrl));
+  const urls = allowProxy
+    ? [directUrl, `${DECIDEPERU_PROXY_URL}${encodeURIComponent(directUrl)}`]
+    : [directUrl];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return {
+        data: await response.json(),
+        proxyUsed: url !== directUrl,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("No se pudo consultar DecidePeru");
+}
+
+async function loadCongressPartyLookup() {
+  ensureCongressFallbackParties();
+  if (congressPartyLookupLoaded) return;
+
+  const responses = await Promise.allSettled(
+    DECIDEPERU_PARTY_URLS.map((url) => fetchCongressJson(url, { allowProxy: false }))
+  );
+
+  responses.forEach((result) => {
+    if (result.status !== "fulfilled" || !Array.isArray(result.value.data)) return;
+    result.value.data.forEach(registerCongressParty);
+  });
+  congressPartyLookupLoaded = true;
+}
+
+function readCongressProgress(metadata) {
+  const values = [];
+  const election = metadata?.acta_onpe?.eleccion;
+  if (election && typeof election.actas_contabilizadas_pct === "number") {
+    values.push(election.actas_contabilizadas_pct);
+  }
+  const elections = metadata?.acta_onpe?.elecciones;
+  if (elections && typeof elections === "object") {
+    Object.values(elections).forEach((item) => {
+      if (item && typeof item.actas_contabilizadas_pct === "number") {
+        values.push(item.actas_contabilizadas_pct);
+      }
+    });
+  }
+  if (typeof metadata?.actas_contabilizadas_pct === "number") values.push(metadata.actas_contabilizadas_pct);
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function readCongressStats(metadata, rows, fallbackSeats) {
+  const validVotesFromRows = rows.reduce((sum, row) => sum + Number(row.votes || 0), 0);
+  const election = metadata?.acta_onpe?.eleccion || {};
+  const elections = metadata?.acta_onpe?.elecciones || {};
+  const electionTotals = Object.values(elections).filter(Boolean);
+  const emittedFromElections = electionTotals.reduce((sum, item) => sum + Number(item.total_votos_emitidos || 0), 0);
+  const validFromElections = electionTotals.reduce((sum, item) => sum + Number(item.total_votos_validos || 0), 0);
+
+  return {
+    totalSeats: Number(metadata?.escanos_total || metadata?.total_escanos || fallbackSeats),
+    totalVotosEmitidos: Number(metadata?.acta_nacional_emitidos || metadata?.votos_emitidos || election.total_votos_emitidos || emittedFromElections || 0),
+    totalVotosValidos: Number(metadata?.valla_denominador_validos_senado_du_dm || metadata?.total_votos_validos_nacionales || metadata?.total_votos_validos || metadata?.votos_validos_acta_nacional || election.total_votos_validos || validFromElections || validVotesFromRows || 0),
+    mesasEscrutadas: readCongressProgress(metadata),
+    generatedAt: metadata?.acta_onpe?.generated_at_scraper || metadata?.generated_at_scraper || "",
+  };
+}
+
+function aggregateCongressRows(rows, totalSeats) {
+  const totals = new Map();
+  rows.forEach((row) => {
+    const key = row.sigla || normalizeCongressName(row.party);
+    const current = totals.get(key) || {
+      party: row.party,
+      sigla: row.sigla,
+      color: row.color,
+      logoUrl: row.logoUrl,
+      seats: 0,
+      votes: 0,
+      territories: 0,
+      rawNames: new Set(),
+    };
+    current.seats += Number(row.seats || 0);
+    current.votes += Number(row.votes || 0);
+    current.territories += row.seats > 0 ? 1 : 0;
+    current.rawNames.add(row.rawParty || row.party);
+    totals.set(key, current);
+  });
+
+  const groups = Array.from(totals.values())
+    .map((row) => ({ ...row, rawNames: Array.from(row.rawNames) }))
+    .sort((a, b) => b.seats - a.seats || b.votes - a.votes || a.party.localeCompare(b.party, "es"));
+
+  const assignedSeats = groups.reduce((sum, row) => sum + row.seats, 0);
+  if (assignedSeats > 0 && assignedSeats < totalSeats) {
+    groups.push({
+      party: "Por definir",
+      sigla: "_",
+      color: "#A8A8A8",
+      logoUrl: "",
+      seats: totalSeats - assignedSeats,
+      votes: 0,
+      territories: 0,
+      rawNames: [],
+      placeholder: true,
+    });
+  }
+
+  return groups;
+}
+
+function pushCongressPartyRows(rows, parties, territory) {
+  Object.entries(parties || {}).forEach(([rawParty, result]) => {
+    const party = getCongressPartyInfo(rawParty);
+    rows.push({
+      party: party.party,
+      sigla: party.sigla,
+      color: party.color,
+      logoUrl: party.logoUrl,
+      rawParty,
+      seats: Number(result?.escanos || 0),
+      votes: Number(result?.votos || 0),
+      pct: Number(result?.porcentaje || 0),
+      ...territory,
+    });
+  });
+}
+
+function transformSenateCongress(data) {
+  const rows = [];
+  const metadata = data?._metadata || {};
+
+  if (data?.distrito_unico?.partidos) {
+    pushCongressPartyRows(rows, data.distrito_unico.partidos, {
+      circunscripcion: "nacional",
+      code: "00",
+      department: "Distrito Nacional",
+    });
+  }
+
+  Object.entries(data?.distrito_multiple || {}).forEach(([rawDepartment, district]) => {
+    const isForeign = normalizeCongressName(rawDepartment).includes("extranjero");
+    const department = isForeign ? { code: "EXT", name: "Extranjero" } : getCongressDepartment(rawDepartment);
+    pushCongressPartyRows(rows, district?.partidos, {
+      circunscripcion: isForeign ? "extranjero" : "regional",
+      code: department.code,
+      department: department.name,
+    });
+  });
+
+  const stats = readCongressStats(metadata, rows, 60);
+  const totalSeats = stats.totalSeats || 60;
+  const groups = aggregateCongressRows(rows, totalSeats);
+  const totalVotes = rows.reduce((sum, row) => sum + row.votes, 0);
+  return { groups, raw: rows, stats, totalSeats, totalVotes };
+}
+
+function transformDeputyCongress(data) {
+  const rows = [];
+  const metadata = data?._metadata || {};
+  const districtMultiple = data?.distrito_multiple || Object.fromEntries(
+    Object.entries(data || {}).filter(([key, value]) => {
+      return !key.startsWith("_") && key !== "distrito_multiple" && value && typeof value === "object" && value.partidos;
+    })
+  );
+
+  Object.entries(districtMultiple || {}).forEach(([rawDepartment, district]) => {
+    const isForeign = normalizeCongressName(rawDepartment).includes("extranjero");
+    const department = isForeign ? { code: "EXT", name: "Extranjero" } : getCongressDepartment(rawDepartment);
+    pushCongressPartyRows(rows, district?.partidos, {
+      circunscripcion: isForeign ? "extranjero" : "regional",
+      code: department.code,
+      department: department.name,
+    });
+  });
+
+  const stats = readCongressStats(metadata, rows, 130);
+  const totalSeats = stats.totalSeats || 130;
+  const groups = aggregateCongressRows(rows, totalSeats);
+  const totalVotes = rows.reduce((sum, row) => sum + row.votes, 0);
+  return { groups, raw: rows, stats, totalSeats, totalVotes };
+}
+
+function formatCongressCandidateName(value) {
+  const raw = String(value || "").trim();
+  const commaIndex = raw.indexOf(",");
+  const readable = commaIndex >= 0
+    ? `${raw.slice(commaIndex + 1).trim()} ${raw.slice(0, commaIndex).trim()}`
+    : raw;
+  return readable.toLowerCase().replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function transformSenateElected(data) {
+  const byParty = new Map();
+
+  function addCandidate(rawParty, candidate, extra = {}) {
+    if (!candidate) return;
+    const party = getCongressPartyInfo(rawParty);
+    const row = {
+      candidate: formatCongressCandidateName(candidate.candidato || candidate.CANDIDATO || ""),
+      circunscripcion: extra.circunscripcion || "",
+      color: party.color,
+      department: extra.department || "",
+      party: party.party,
+      position: Number(candidate.numlista ?? candidate.NUMLISTA ?? 0),
+      sigla: party.sigla,
+      votes: Number(candidate.votos_preferenciales ?? candidate.votos ?? candidate.TOTAL_VOTOS ?? 0),
+    };
+    if (!row.candidate) return;
+    const rows = byParty.get(party.sigla) || [];
+    rows.push(row);
+    byParty.set(party.sigla, rows);
+  }
+
+  Object.entries(data?.distrito_unico || {}).forEach(([rawParty, candidatesList]) => {
+    if (!Array.isArray(candidatesList)) return;
+    candidatesList.forEach((candidate) => {
+      addCandidate(rawParty, candidate, {
+        circunscripcion: "Distrito Nacional",
+        department: "Nacional",
+      });
+    });
+  });
+
+  Object.entries(data?.distrito_multiple || {}).forEach(([rawDepartment, parties]) => {
+    const isForeign = normalizeCongressName(rawDepartment).includes("extranjero");
+    const department = isForeign ? { code: "EXT", name: "Extranjero" } : getCongressDepartment(rawDepartment);
+    Object.entries(parties || {}).forEach(([rawParty, candidatesList]) => {
+      if (!Array.isArray(candidatesList)) return;
+      candidatesList.forEach((candidate) => {
+        addCandidate(rawParty, candidate, {
+          circunscripcion: isForeign ? "Exterior" : "Distrito Regional",
+          department: department.name,
+        });
+      });
+    });
+  });
+
+  byParty.forEach((rows, sigla) => {
+    const seen = new Set();
+    const unique = rows
+      .sort((a, b) => b.votes - a.votes || a.position - b.position)
+      .filter((row) => {
+        const key = `${normalizeText(row.candidate)}|${row.department}|${row.position}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    byParty.set(sigla, unique);
+  });
+
+  return byParty;
+}
+
+function buildCongressSeats(groups, totalSeats) {
+  const seats = [];
+  groups.forEach((group) => {
+    for (let index = 0; index < Number(group.seats || 0); index += 1) {
+      seats.push(group);
+    }
+  });
+  return seats.slice(0, totalSeats);
+}
+
+function scaleSeatRows(totalSeats, baseRows) {
+  const currentTotal = baseRows.reduce((sum, count) => sum + count, 0);
+  if (currentTotal === totalSeats) return [...baseRows];
+  const scale = totalSeats / currentTotal;
+  const rows = baseRows.map((count) => Math.max(1, Math.round(count * scale)));
+  let diff = totalSeats - rows.reduce((sum, count) => sum + count, 0);
+  let index = 0;
+  while (diff !== 0) {
+    const target = index % rows.length;
+    if (diff > 0) {
+      rows[target] += 1;
+      diff -= 1;
+    } else if (rows[target] > 1) {
+      rows[target] -= 1;
+      diff += 1;
+    }
+    index += 1;
+  }
+  return rows;
+}
+
+function renderCongressHemicycle(rootId, chamber, variant) {
+  const root = document.querySelector(`#${rootId}`);
+  if (!root) return;
+  const groups = chamber.groups || [];
+  const totalSeats = Number(chamber.totalSeats || (variant === "senate" ? 60 : 130));
+
+  if (congressState.isLoading && !groups.length) {
+    root.innerHTML = `<div class="congress-loading">Cargando curules de DecidePeru...</div>`;
+    return;
+  }
+
+  if (!groups.length) {
+    root.innerHTML = `<div class="congress-loading">Sin datos congresales disponibles.</div>`;
+    return;
+  }
+
+  const config = variant === "senate"
+    ? { width: 406, height: 192, dot: 13.5, rows: [17, 14, 12, 10, 7] }
+    : { width: 403, height: 197, dot: 12, rows: [28, 25, 21, 18, 15, 11, 8, 4] };
+  const rowCounts = scaleSeatRows(totalSeats, config.rows);
+  const seats = buildCongressSeats(groups, totalSeats);
+  const points = [];
+  const centerX = config.width / 2;
+  const centerY = config.height;
+  const outerRadius = config.height * 0.92;
+  const radiusStep = config.height * (variant === "senate" ? 0.13 : 0.11);
+  const angleStart = 5 * Math.PI / 180;
+  const angleEnd = 175 * Math.PI / 180;
+
+  rowCounts.forEach((count, rowIndex) => {
+    const radius = outerRadius - rowIndex * radiusStep;
+    for (let seatIndex = 0; seatIndex < count; seatIndex += 1) {
+      const ratio = count > 1 ? seatIndex / (count - 1) : 0.5;
+      const angle = angleStart + ratio * (angleEnd - angleStart);
+      points.push({
+        x: centerX - radius * Math.cos(angle),
+        y: centerY - radius * Math.sin(angle),
+      });
+    }
+  });
+
+  points.sort((a, b) => a.x - b.x);
+
+  root.innerHTML = `
+    <svg viewBox="0 0 ${config.width} ${config.height}" role="img" aria-label="Hemiciclo de ${variant === "senate" ? "senadores" : "diputados"}">
+      ${seats.map((seat, index) => {
+        const point = points[index] || { x: centerX, y: centerY };
+        return `
+          <circle
+            class="hemicycle-seat${seat.placeholder ? " is-placeholder" : ""}"
+            cx="${point.x.toFixed(2)}"
+            cy="${point.y.toFixed(2)}"
+            ${seat.placeholder ? "" : `data-congress-party="${escapeHtml(seat.sigla)}" data-congress-party-name="${escapeHtml(seat.party)}" role="button" tabindex="0"`}
+            r="${(config.dot / 2).toFixed(2)}"
+            fill="${seat.color}"
+          >
+            <title>${escapeHtml(seat.party)} (${escapeHtml(seat.sigla)}): ${seat.seats} curules</title>
+          </circle>
+        `;
+      }).join("")}
+    </svg>
+    <span class="congress-watermark">@DecidePeru</span>
+  `;
+}
+
+function renderCongressList(rootId, chamber, label) {
+  const root = document.querySelector(`#${rootId}`);
+  if (!root) return;
+  const groups = chamber.groups || [];
+
+  if (congressState.isLoading && !groups.length) {
+    root.innerHTML = `
+      <div class="congress-undecided">
+        <strong>Consultando DecidePeru</strong>
+        <span>Buscando curules, votos y actas contabilizadas.</span>
+      </div>
+    `;
+    return;
+  }
+
+  if (!groups.length) {
+    root.innerHTML = `
+      <div class="congress-undecided">
+        <strong>No hay datos disponibles</strong>
+        <span>Abre DecidePeru con los botones superiores para ver la fuente directa.</span>
+      </div>
+    `;
+    return;
+  }
+
+  const maxSeats = Math.max(...groups.map((row) => row.seats), 1);
+  const totalVotes = chamber.totalVotes || groups.reduce((sum, row) => sum + Number(row.votes || 0), 0);
+
+  root.innerHTML = `
+    ${groups.map((row, index) => {
+      const votePct = totalVotes ? (Number(row.votes || 0) / totalVotes) * 100 : 0;
+      return `
+        <div class="congress-row${row.placeholder ? " is-placeholder" : " is-clickable"}" ${row.placeholder ? "" : `data-congress-party="${escapeHtml(row.sigla)}" data-congress-party-name="${escapeHtml(row.party)}" tabindex="0" role="button"`} style="--party-color:${row.color}">
+          <div class="congress-row-head">
+            <div>
+              <span class="congress-rank">${row.placeholder ? "-" : index + 1}</span>
+              <strong>${escapeHtml(row.party)}</strong>
+            </div>
+            <strong>${formatter.format(row.seats)}</strong>
+          </div>
+          <div class="congress-bar">
+            <span style="width:${Math.max(4, (row.seats / maxSeats) * 100).toFixed(2)}%"></span>
+          </div>
+          <div class="congress-row-foot">
+            <span>${row.votes ? `${formatter.format(Math.round(row.votes))} votos - ${votePct.toFixed(2)}%` : "Sin votos asignados"}</span>
+            <span>${label}</span>
+          </div>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
+function formatCongressUpdatedAt(value) {
+  if (!value) return "Esperando datos";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleDateString("es-PE", { day: "2-digit", month: "short" })} ${formatTime(date)}`;
+}
+
+function renderCongressStats() {
+  const source = document.querySelector("#congressSourceStatus");
+  const updated = document.querySelector("#congressUpdatedAt");
+  const note = document.querySelector("#congressMethodNote");
+  const senateSeats = document.querySelector("#senateTotalSeats");
+  const deputySeats = document.querySelector("#deputyTotalSeats");
+
+  if (senateSeats) senateSeats.textContent = formatter.format(congressState.senate.totalSeats || 60);
+  if (deputySeats) deputySeats.textContent = formatter.format(congressState.deputies.totalSeats || 130);
+
+  const statusText = congressState.isLoading
+    ? "Consultando"
+    : congressState.status === "ok"
+      ? "En vivo"
+      : congressState.status === "error"
+        ? "Sin conexion"
+        : "Pendiente";
+  if (source) source.textContent = statusText;
+  if (updated) updated.textContent = congressState.updatedAt
+    ? formatCongressUpdatedAt(congressState.updatedAt)
+    : "DecidePeru";
+
+  if (note) {
+    const senateStats = congressState.senate.stats;
+    const deputyStats = congressState.deputies.stats;
+    const senateProgress = senateStats?.mesasEscrutadas ? `${senateStats.mesasEscrutadas.toFixed(3)}% Senado` : "Senado sin avance";
+    const deputyProgress = deputyStats?.mesasEscrutadas ? `${deputyStats.mesasEscrutadas.toFixed(3)}% Diputados` : "Diputados sin avance";
+    const proxyText = congressState.proxyUsed ? " Se usa proxy CORS porque CloudFront solo autoriza a decideperu.com." : "";
+    const errorText = congressState.error ? ` Error: ${congressState.error}.` : "";
+    note.textContent = `Datos de DecidePeru solo para Congreso: ${senateProgress}, ${deputyProgress}.${proxyText}${errorText} La vista presidencial sigue usando ONPE.`;
+  }
+}
+
+function getSenatePartyGroup(sigla) {
+  return congressState.senate.groups.find((group) => group.sigla === sigla);
+}
+
+function getSenatorsEntering(sigla) {
+  const group = getSenatePartyGroup(sigla);
+  const rows = congressState.senateElects.get(sigla) || [];
+  const seats = Math.max(0, Number(group?.seats || 0));
+  return rows.slice(0, seats || rows.length);
+}
+
+function getSenatorDialogHtml(sigla) {
+  const group = getSenatePartyGroup(sigla);
+  const rows = getSenatorsEntering(sigla);
+  const allRows = congressState.senateElects.get(sigla) || [];
+  const partyName = group?.party || allRows[0]?.party || sigla || "Partido";
+  const partyColor = group?.color || allRows[0]?.color || "#6b7280";
+  const seats = Math.max(0, Number(group?.seats || rows.length || 0));
+  const partyVotes = Number(group?.votes || 0);
+
+  if (congressState.isLoading && !allRows.length) {
+    return `
+      <div class="senator-popup">
+        <p class="eyebrow">Senadores</p>
+        <h2>Consultando DecidePeru</h2>
+        <p>Buscando senadores electos y votos preferenciales.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="senator-popup" style="--party-color:${partyColor}">
+      <div class="senator-popup-head">
+        <div>
+          <p class="eyebrow">Senadores que entran</p>
+          <h2>${escapeHtml(partyName)}</h2>
+          <p>${formatter.format(seats)} curules - ${partyVotes ? `${formatter.format(Math.round(partyVotes))} votos de partido` : "votos de partido pendientes"}</p>
+        </div>
+        <span>${escapeHtml(sigla)}</span>
+      </div>
+
+      ${rows.length ? `
+        <div class="senator-list">
+          ${rows.map((row, index) => `
+            <article class="senator-person">
+              <span class="senator-rank">${index + 1}</span>
+              <div>
+                <strong>${escapeHtml(row.candidate)}</strong>
+                <small>${escapeHtml(row.department)} - ${escapeHtml(row.circunscripcion)}${row.position ? ` - lista ${row.position}` : ""}</small>
+              </div>
+              <b>${formatter.format(Math.round(row.votes))}</b>
+            </article>
+          `).join("")}
+        </div>
+      ` : `
+        <div class="congress-undecided">
+          <strong>Sin lista preferencial disponible</strong>
+          <span>DecidePeru tiene curules para este partido, pero no se encontraron nombres de senadores electos en el archivo preferencial.</span>
+        </div>
+      `}
+
+      <p class="senator-popup-note">Los nombres se ordenan por votos preferenciales y se muestran hasta completar las curules asignadas al partido en el Senado.</p>
+    </div>
+  `;
+}
+
+async function openSenatorPopup(sigla) {
+  const dialog = document.querySelector("#senatorDialog");
+  const content = document.querySelector("#senatorDialogContent");
+  if (!dialog || !content || !sigla) return;
+  selectedCongressPartySigla = sigla;
+  content.innerHTML = getSenatorDialogHtml(sigla);
+  showDialog(dialog);
+  if (!congressState.loaded && !congressState.isLoading) {
+    await refreshCongressDashboard({ silent: true });
+    content.innerHTML = getSenatorDialogHtml(sigla);
+  }
+}
+
+function renderCongressDashboard() {
+  renderCongressStats();
+  renderCongressHemicycle("senateHemicycle", congressState.senate, "senate");
+  renderCongressHemicycle("deputyHemicycle", congressState.deputies, "deputy");
+  renderCongressList("senateRows", congressState.senate, "curules Senado");
+  renderCongressList("deputyRows", congressState.deputies, "curules Diputados");
+}
+
+async function refreshCongressDashboard({ silent = false } = {}) {
+  if (congressState.isLoading) return;
+  congressState = {
+    ...congressState,
+    error: "",
+    isLoading: true,
+    status: congressState.loaded ? congressState.status : "pending",
+  };
+  if (!silent) renderCongressDashboard();
+
+  try {
+    await loadCongressPartyLookup();
+    const currentResult = await fetchCongressJson(DECIDEPERU_CURRENT_URL);
+    const current = currentResult.data || {};
+    const [senateResult, deputyResult] = await Promise.all([
+      fetchCongressJson(current.senadores_escanos || "publish/senadores/senadores_escanos.json"),
+      fetchCongressJson(current.diputados_escanos || "publish/diputados/diputados_escanos.json"),
+    ]);
+    let senateElects = congressState.senateElects;
+    let senatorElectsProxyUsed = false;
+    try {
+      const senatorElectsResult = await fetchCongressJson(current.senadores_electos || "publish/senadores/senadores_electos.json");
+      senateElects = transformSenateElected(senatorElectsResult.data);
+      senatorElectsProxyUsed = senatorElectsResult.proxyUsed;
+    } catch (error) {
+      console.warn("No se pudo cargar senadores electos", error);
+    }
+
+    congressState = {
+      ...congressState,
+      error: "",
+      isLoading: false,
+      lastFetchAt: Date.now(),
+      loaded: true,
+      proxyUsed: currentResult.proxyUsed || senateResult.proxyUsed || deputyResult.proxyUsed || senatorElectsProxyUsed,
+      senateElects,
+      senate: transformSenateCongress(senateResult.data),
+      deputies: transformDeputyCongress(deputyResult.data),
+      status: "ok",
+      updatedAt: current.updated_at || Date.now(),
+    };
+  } catch (error) {
+    console.error("No se pudo actualizar Congreso desde DecidePeru", error);
+    congressState = {
+      ...congressState,
+      error: error.message || "No se pudo consultar DecidePeru",
+      isLoading: false,
+      status: "error",
+    };
+  }
+
+  renderCongressDashboard();
+  const senatorDialog = document.querySelector("#senatorDialog");
+  const senatorContent = document.querySelector("#senatorDialogContent");
+  if (senatorDialog?.open && senatorContent && selectedCongressPartySigla) {
+    senatorContent.innerHTML = getSenatorDialogHtml(selectedCongressPartySigla);
+  }
+}
+
+function renderSources() {
+  const root = document.querySelector("#sourceCards");
+  root.innerHTML = candidates
+    .map(
+      (candidate) => `
+        <div class="source-card">
+          <span>${candidate.name}</span>
+          <strong style="color:${candidate.color}">${candidate.projected.toFixed(3)}%</strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function getEstimatedTotalVotes() {
+  if (latestProjectionModel?.projectedValidVotes) return latestProjectionModel.projectedValidVotes;
+  const progress = clampProgress(latestNationalPct);
+  const countedVotes = Number(latestCountedVotes || 0);
+  if (progress > 0 && countedVotes > 0) return countedVotes / progress;
+  return estimateValidVotesFromCandidates("projected") || estimateValidVotesFromCandidates("onpe");
+}
+
+function formatVotesCompact(value) {
+  const number = Math.max(0, Number(value || 0));
+  if (number >= 1000000) return `${(number / 1000000).toFixed(2)} M`;
+  if (number >= 1000) return `${(number / 1000).toFixed(0)} K`;
+  return formatter.format(Math.round(number));
+}
+
+function moveChartTooltip(event) {
+  const chartPanel = document.querySelector(".chart-panel");
+  const tooltip = document.querySelector("#chartTooltip");
+  if (!chartPanel || !tooltip) return;
+  const rect = chartPanel.getBoundingClientRect();
+  tooltip.style.setProperty("--chart-tooltip-x", `${event.clientX - rect.left}px`);
+  tooltip.style.setProperty("--chart-tooltip-y", `${event.clientY - rect.top}px`);
+}
+
+function showChartTooltip(point, event) {
+  const tooltip = document.querySelector("#chartTooltip");
+  if (!tooltip) return;
+  tooltip.innerHTML = `
+    <strong>${escapeHtml(point.dataset.name)}</strong>
+    <span>${escapeHtml(point.dataset.cut)}</span>
+    <b>${Number(point.dataset.pct || 0).toFixed(3)}%</b>
+    <small>${point.dataset.votes ? `${formatter.format(Number(point.dataset.votes || 0))} votos proy.` : ""}</small>
+  `;
+  moveChartTooltip(event);
+  tooltip.classList.add("visible");
+}
+
+function hideChartTooltip() {
+  document.querySelector("#chartTooltip")?.classList.remove("visible");
+}
+
+function bindChartTooltip(svg) {
+  if (!svg) return;
+  svg.onpointerover = (event) => {
+    const point = event.target.closest?.("[data-chart-point]");
+    if (!point) return;
+    showChartTooltip(point, event);
+  };
+  svg.onpointermove = (event) => {
+    const point = event.target.closest?.("[data-chart-point]");
+    if (!point) return;
+    moveChartTooltip(event);
+  };
+  svg.onpointerout = (event) => {
+    const point = event.target.closest?.("[data-chart-point]");
+    if (!point) return;
+    hideChartTooltip();
+  };
+}
+
+function renderChart() {
+  const svg = document.querySelector("#trendChart");
+  if (!svg) return;
+  const summary = document.querySelector("#chartSummary");
+  const width = 820;
+  const height = 380;
+  const padding = { top: 28, right: 138, bottom: 52, left: 92 };
+  const latestPct = Number(latestNationalPct || 0);
+  const chartCandidates = ["sanch", "rla"]
+    .map((key) => candidates.find((candidate) => candidate.key === key))
+    .filter(Boolean);
+  const series = chartCandidates.map((candidate) => {
+    const sourceIndex = candidates.findIndex((item) => item.key === candidate.key);
+    const historyPercentages = (trends[sourceIndex] || [candidate.onpe || candidate.projected || 0]).map((pct) => Number(pct || 0));
+    const projectedPct = Number(candidate.projected || candidate.onpe || 0);
+    const percentagePoints = [...historyPercentages, projectedPct];
+    return {
+      candidate,
+      evolutionLength: historyPercentages.length,
+      points: percentagePoints,
+      projectedVotes: Number(candidate.projectedVotes || 0),
+    };
+  });
+  const finalRows = series
+    .map((item) => ({
+      candidate: item.candidate,
+      pct: item.points.at(-1) || 0,
+      votes: item.projectedVotes || 0,
+    }))
+    .sort((a, b) => b.pct - a.pct);
+  const gapVotes = Math.abs((finalRows[0]?.votes || 0) - (finalRows[1]?.votes || 0));
+  const gapPct = Math.abs((finalRows[0]?.pct || 0) - (finalRows[1]?.pct || 0));
+
+  if (summary && finalRows.length >= 2) {
+    summary.innerHTML = `
+      <div class="chart-summary-card" style="--summary-color:${finalRows[0].candidate.color}">
+        <span>Va arriba</span>
+        <strong>${finalRows[0].candidate.name}</strong>
+        <small>${finalRows[0].pct.toFixed(3)}% proy. - ${formatter.format(Math.round(finalRows[0].votes))} votos</small>
+      </div>
+      <div class="chart-summary-card" style="--summary-color:${finalRows[1].candidate.color}">
+        <span>Segundo</span>
+        <strong>${finalRows[1].candidate.name}</strong>
+        <small>${finalRows[1].pct.toFixed(3)}% proy. - ${formatter.format(Math.round(finalRows[1].votes))} votos</small>
+      </div>
+      <div class="chart-summary-card gap-card">
+        <span>Diferencia proyectada</span>
+        <strong>${gapPct.toFixed(3)} pp</strong>
+        <small>${formatter.format(Math.round(gapVotes))} votos - avance ONPE ${latestPct.toFixed(3)}%</small>
+      </div>
+    `;
+  }
+
+  const allValues = series.flatMap((item) => item.points).filter(Number.isFinite);
+  const maxValue = Math.max(...allValues, 1);
+  const minValue = Math.min(...allValues, maxValue * 0.98);
+  const range = Math.max(maxValue - minValue, maxValue * 0.015, 1);
+  const yMin = Math.max(0, minValue - range * 0.32);
+  const yMax = maxValue + range * 0.32;
+  const pointCount = Math.max(...series.map((item) => item.points.length), 2);
+  const xStep = (width - padding.left - padding.right) / (pointCount - 1);
+  const y = (value) => height - padding.bottom - ((value - yMin) / (yMax - yMin || 1)) * (height - padding.top - padding.bottom);
+
+  const grid = Array.from({ length: 5 }, (_, index) => {
+    const ratio = index / 4;
+    const value = yMax - (yMax - yMin) * ratio;
+    const yy = y(value);
+    return `
+      <line x1="${padding.left}" x2="${width - padding.right}" y1="${yy}" y2="${yy}" stroke="rgba(20,32,46,0.12)" />
+      <text class="chart-axis-label" x="${padding.left - 10}" y="${yy + 4}" text-anchor="end">${value.toFixed(3)}%</text>
+    `;
+  }).join("");
+
+  const advanceLabels = Array.from({ length: pointCount }, (_, index) => {
+    if (pointCount > 8 && index % Math.ceil(pointCount / 6) !== 0 && index !== pointCount - 1) return "";
+    const x = padding.left + index * xStep;
+    const historyEndIndex = Math.max(1, pointCount - 2);
+    const ratio = Math.min(1, index / historyEndIndex);
+    if (index === pointCount - 1) {
+      return `
+        <line x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${height - padding.bottom}" y2="${height - padding.bottom + 5}" stroke="rgba(20,32,46,0.28)" />
+        <text class="chart-axis-label" x="${x.toFixed(2)}" y="${height - 16}" text-anchor="middle">100% proy.</text>
+      `;
+    }
+    const approxPct = latestPct
+      ? Math.max(0, latestPct - (1 - ratio) * 1.8)
+      : 0;
+    return `
+      <line x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${height - padding.bottom}" y2="${height - padding.bottom + 5}" stroke="rgba(20,32,46,0.28)" />
+      <text class="chart-axis-label" x="${x.toFixed(2)}" y="${height - 16}" text-anchor="middle">${approxPct ? approxPct.toFixed(1) + "%" : `C${index + 1}`}</text>
+    `;
+  }).join("");
+
+  let gapArea = "";
+  if (series.length >= 2 && series[0].points.length === series[1].points.length) {
+    const topLine = [];
+    const bottomLine = [];
+    series[0].points.forEach((value, index) => {
+      const other = series[1].points[index];
+      const x = padding.left + index * xStep;
+      const higher = Math.max(value, other);
+      const lower = Math.min(value, other);
+      topLine.push(`${x.toFixed(2)},${y(higher).toFixed(2)}`);
+      bottomLine.unshift(`${x.toFixed(2)},${y(lower).toFixed(2)}`);
+    });
+    gapArea = `<polygon class="chart-gap-area" points="${[...topLine, ...bottomLine].join(" ")}"></polygon>`;
+  }
+
+  const lines = series
+    .map(({ candidate, evolutionLength, points, projectedVotes }) => {
+      const historicalPoints = points.slice(0, Math.max(1, evolutionLength));
+      const projectionPoints = points.slice(Math.max(0, evolutionLength - 1));
+      const makePath = (pathPoints, offset = 0) => pathPoints
+        .map((point, pointIndex) => {
+          const x = padding.left + (pointIndex + offset) * xStep;
+          return `${pointIndex === 0 ? "M" : "L"} ${x.toFixed(2)} ${y(point).toFixed(2)}`;
+        })
+        .join(" ");
+      const focusClass = selectedCandidateKey && selectedCandidateKey !== candidate.key ? " is-dim" : selectedCandidateKey === candidate.key ? " is-selected" : "";
+      const endPct = points.at(-1) || 0;
+      const lastX = padding.left + (points.length - 1) * xStep;
+      const lastY = y(endPct);
+      const dots = points
+        .map((point, pointIndex) => {
+          const x = padding.left + pointIndex * xStep;
+          const projectionClass = pointIndex === points.length - 1 ? " is-projection" : "";
+          const title = pointIndex === points.length - 1
+            ? `${candidate.name}: prediccion ${point.toFixed(3)}%`
+            : `${candidate.name}: ${point.toFixed(3)}% en corte`;
+          return `<circle class="chart-point${focusClass}${projectionClass}" cx="${x.toFixed(2)}" cy="${y(point).toFixed(2)}" r="${pointIndex === points.length - 1 ? 5 : 3.8}" fill="${candidate.color}" data-chart-point="true" data-name="${escapeHtml(candidate.name)}" data-votes="${pointIndex === points.length - 1 ? Math.round(projectedVotes) : ""}" data-pct="${Number(point || 0).toFixed(3)}" data-cut="${pointIndex === points.length - 1 ? "Prediccion final" : `Corte ${pointIndex + 1}`}"><title>${title}</title></circle>`;
+        })
+        .join("");
+      return `
+        <path class="chart-line${focusClass}" d="${makePath(historicalPoints)}" stroke="${candidate.color}" data-candidate="${candidate.key}" data-name="${candidate.name}" data-end-votes="${Math.round(projectedVotes)}" data-end-pct="${endPct.toFixed(3)}"></path>
+        <path class="chart-line chart-line-projection${focusClass}" d="${makePath(projectionPoints, Math.max(0, evolutionLength - 1))}" stroke="${candidate.color}" data-candidate="${candidate.key}" data-name="${candidate.name}" data-end-votes="${Math.round(projectedVotes)}" data-end-pct="${endPct.toFixed(3)}"></path>
+        <circle class="chart-dot${focusClass}" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="4" fill="${candidate.color}"></circle>
+        ${dots}
+      `;
+    })
+    .join("");
+
+  const labels = series
+    .map(({ candidate, points }) => {
+      const last = points.at(-1) || 0;
+      return `<text class="chart-end-label" x="${width - padding.right + 12}" y="${y(last) + 4}" fill="${candidate.color}">${candidate.name} ${last.toFixed(3)}%</text>`;
+    })
+    .join("");
+
+  const baseLine = height - padding.bottom;
+  const axis = `
+    <line x1="${padding.left}" x2="${width - padding.right}" y1="${baseLine}" y2="${baseLine}" stroke="rgba(20,32,46,0.22)" />
+    <text class="chart-axis-label" x="${padding.left}" y="${height - 4}">Avance ONPE estimado por corte</text>
+    <text class="chart-axis-label" x="${width - padding.right}" y="${height - 4}" text-anchor="end">Prediccion final</text>
+  `;
+
+  svg.innerHTML = `${grid}${gapArea}${axis}${advanceLabels}${lines}${labels}`;
+  bindChartTooltip(svg);
+  svg.querySelectorAll(".chart-line").forEach((line) => {
+    line.addEventListener("click", () => {
+      selectedCandidateKey = line.dataset.candidate;
+      renderCandidateCards();
+      renderMap();
+      renderChart();
+      renderSelectedCandidatePanel();
+      const chartNote = document.querySelector("#chartNote");
+      if (chartNote) {
+        chartNote.textContent = `${line.dataset.name}: prediccion final ${Number(line.dataset.endPct || 0).toFixed(3)}%, equivalente a ${formatter.format(Number(line.dataset.endVotes || 0))} votos proyectados.`;
+      }
+    });
+  });
+}
+
+function formatTime(value) {
+  const date = value ? new Date(value) : new Date();
+  return date.toLocaleTimeString("es-PE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function animateTotalPercentage(nextValue) {
+  const element = document.querySelector("#counted");
+  if (!element) return;
+
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const endValue = Number(nextValue || 0);
+  const currentValue = Number.parseFloat(element.textContent) || 0;
+  let startValue = !hasAnimatedTotal || forceTotalFromZero ? 0 : currentValue;
+  forceTotalFromZero = false;
+
+  if (totalPercentAnimation) {
+    cancelAnimationFrame(totalPercentAnimation);
+  }
+
+  if (prefersReducedMotion) {
+    element.textContent = `${endValue.toFixed(3)}%`;
+    hasAnimatedTotal = true;
+    return;
+  }
+
+  const duration = 1200;
+  const startedAt = performance.now();
+  element.classList.add("counting");
+
+  const tick = (now) => {
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = startValue + (endValue - startValue) * eased;
+    element.textContent = `${value.toFixed(3)}%`;
+
+    if (progress < 1) {
+      totalPercentAnimation = requestAnimationFrame(tick);
+    } else {
+      element.textContent = `${endValue.toFixed(3)}%`;
+      element.classList.remove("counting");
+      hasAnimatedTotal = true;
+      totalPercentAnimation = null;
+    }
+  };
+
+  totalPercentAnimation = requestAnimationFrame(tick);
+}
+
+function renderRegionOptions() {
+  const select = document.querySelector("#regionSelect");
+  const search = document.querySelector("#regionSearch");
+  if (!select) return;
+  const query = normalizeText(search?.value || "");
+  const names = (liveRegions.length ? liveRegions.map((region) => region.name) : departments)
+    .sort((a, b) => a.localeCompare(b, "es"));
+  const filtered = names.filter((name) => normalizeText(name).includes(query));
+  select.innerHTML = `<option value="">Selecciona departamento</option>` + filtered
+    .map((name) => `<option value="${name}">${name}</option>`)
+    .join("");
+  if (selectedRegionName && filtered.includes(selectedRegionName)) {
+    select.value = selectedRegionName;
+  }
+}
+
+function renderRegionPanel() {
+  const panel = document.querySelector("#regionPanel");
+  if (!panel) return;
+  panel.innerHTML = getRegionPanelHtml(selectedRegionName);
+}
+
+function showDialog(dialog) {
+  if (!dialog) return;
+  if (!dialog.open) {
+    dialog.showModal();
+  }
+  requestAnimationFrame(() => dialog.classList.add("is-visible"));
+}
+
+function closeDialog(dialog) {
+  if (!dialog?.open) return;
+  dialog.classList.remove("is-visible");
+  window.setTimeout(() => {
+    if (dialog.open && !dialog.classList.contains("is-visible")) {
+      dialog.close();
+    }
+  }, 180);
+}
+
+function getRegionPanelHtml(regionName) {
+  const region = regionName ? getRegion(regionName) : null;
+  if (!region) {
+    return `
+      <p class="empty-state">Selecciona un departamento o toca el mapa para ver actas, votos y ranking local.</p>
+    `;
+  }
+
+  const { regionalCandidates, winner, runnerUp, gap, voteGap } = getRegionSummary(region);
+  const counted = Number(region.pct || 0).toFixed(2);
+  const validVotes = Number(region.vv || 0);
+  const totalActs = Number(region.totalActas || 0);
+  const countedActs = Number(region.contabilizadas || 0);
+  const jeeActs = Number(region.enviadasJee || 0);
+  const pendingActs = Math.max(0, totalActs - countedActs - jeeActs);
+  const closeRace = gap <= 2.5 || voteGap <= 5000;
+  const raceLabel = closeRace ? "Region clave" : "Margen estable";
+  const raceClass = closeRace ? "is-tight" : "is-stable";
+  const topCandidates = regionalCandidates.slice(0, 5);
+
+  return `
+    <div class="region-detail" style="--winner-color:${winner.color}">
+      <div class="region-hero">
+        <div>
+          <span>Departamento</span>
+          <strong>${escapeHtml(region.name)}</strong>
+          <small>${formatter.format(countedActs)} de ${formatter.format(totalActs)} actas contabilizadas - ${counted}%</small>
+        </div>
+        <div class="winner-badge">
+          <span>Va primero</span>
+          <strong>${escapeHtml(winner.name)}</strong>
+          <small>${winner.pct.toFixed(2)}% - ${formatter.format(winner.regionalVotes)} votos</small>
+        </div>
+      </div>
+
+      <div class="region-race-card ${raceClass}">
+        <div>
+          <span>${raceLabel}</span>
+          <strong>${gap.toFixed(2)} pp</strong>
+          <small>${formatter.format(voteGap)} votos separan a ${escapeHtml(winner.name)} de ${escapeHtml(runnerUp.name)}</small>
+        </div>
+        <span class="region-race-pill">${closeRace ? "Competencia cerrada" : "Ventaja clara"}</span>
+      </div>
+
+      <div class="region-head">
+        <div>
+          <span>Votos validos</span>
+          <strong>${formatter.format(validVotes)}</strong>
+        </div>
+        <div>
+          <span>Actas JEE</span>
+          <strong>${formatter.format(jeeActs)}</strong>
+        </div>
+        <div>
+          <span>Actas pendientes</span>
+          <strong>${formatter.format(pendingActs)}</strong>
+        </div>
+        <div>
+          <span>Segundo lugar</span>
+          <strong style="color:${runnerUp.color}">${escapeHtml(runnerUp.name)}</strong>
+        </div>
+      </div>
+
+      <div class="region-callout">
+        ${escapeHtml(winner.name)} supera a ${escapeHtml(runnerUp.name)} por ${gap.toFixed(2)} puntos en ${escapeHtml(region.name)}. ${closeRace ? "Esta region puede mover la lectura publica si entran nuevas actas." : "La ventaja local es mas amplia con la data actual."}
+      </div>
+
+      <div class="region-list-title">
+        <strong>Top 5 candidatos</strong>
+        <span>${formatter.format(validVotes)} votos validos</span>
+      </div>
+
+      <div class="region-bars">
+        ${topCandidates.map((candidate, index) => `
+          <div class="region-row${index === 0 ? " winner" : ""}" style="--row-color:${candidate.color}">
+            <div class="region-row-meta">
+              <div>
+                <span class="region-rank">${index + 1}</span>
+                <strong>${escapeHtml(candidate.name)}</strong>
+              </div>
+              <span>${candidate.pct.toFixed(2)}% - ${formatter.format(candidate.regionalVotes)} votos</span>
+            </div>
+            <div class="bar"><span style="width:${Math.min(candidate.pct, 100)}%; background:${candidate.color}"></span></div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="region-actions">
+        <button type="button" data-region-focus="${winner.key}">Resaltar ganador en el mapa</button>
+        <button type="button" data-region-focus="${runnerUp.key}">Comparar con segundo</button>
+      </div>
+    </div>
+  `;
+}
+
+function openRegionPopup(regionName) {
+  selectedRegionName = regionName;
+  const dialog = document.querySelector("#regionDialog");
+  const content = document.querySelector("#regionDialogContent");
+  if (!dialog || !content) return;
+  if (dialog.open) {
+    content.classList.add("is-switching");
+  }
+  content.innerHTML = getRegionPanelHtml(regionName);
+  requestAnimationFrame(() => {
+    content.classList.remove("is-switching");
+    showDialog(dialog);
+  });
+}
+
+function getCandidatePopupHtml(candidateKey) {
+  const candidate = getCandidate(candidateKey);
+  if (!candidate) {
+    return `
+      <div class="candidate-popup">
+        <h2>Candidato</h2>
+        <p>Esperando datos del candidato seleccionado.</p>
+      </div>
+    `;
+  }
+
+  const ranked = getProjectedRankedCandidates();
+  const rank = ranked.findIndex((item) => item.key === candidate.key) + 1;
+  const projectedPct = Number(candidate.projected || candidate.onpe || 0);
+  const projectedVotes = Number(candidate.projectedVotes || candidate.votes || 0);
+  const countedVotes = Number(candidate.votes || 0);
+  const voteDelta = Number(candidate.lastVoteDelta ?? candidate.voteDelta ?? 0);
+  const cumulativeVoteDelta = Number(candidate.cumulativeVoteDelta || 0);
+  const second = ranked[1];
+  const third = ranked[2];
+  const nextBehind = ranked[rank] || null;
+  let reading = `${candidate.name} registra ${candidate.onpe.toFixed(3)}% en ONPE y una proyeccion de ${projectedPct.toFixed(3)}%.`;
+
+  if (rank === 1 && nextBehind) {
+    const pctGap = projectedPct - Number(nextBehind.projected || nextBehind.onpe || 0);
+    const voteGap = projectedVotes - Number(nextBehind.projectedVotes || nextBehind.votes || 0);
+    reading = `${candidate.name} lidera la proyeccion por ${pctGap.toFixed(3)} puntos, cerca de ${formatter.format(Math.max(0, Math.round(voteGap)))} votos proyectados sobre ${nextBehind.name}.`;
+  } else if (rank === 2 && third) {
+    const pctGap = projectedPct - Number(third.projected || third.onpe || 0);
+    const voteGap = projectedVotes - Number(third.projectedVotes || third.votes || 0);
+    reading = `${candidate.name} esta en zona de segunda vuelta y supera a ${third.name} por ${pctGap.toFixed(3)} puntos, aproximadamente ${formatter.format(Math.max(0, Math.round(voteGap)))} votos proyectados.`;
+  } else if (rank > 2 && second) {
+    const pctGap = Number(second.projected || second.onpe || 0) - projectedPct;
+    const voteGap = Number(second.projectedVotes || second.votes || 0) - projectedVotes;
+    reading = `${candidate.name} necesita recortar ${Math.max(0, pctGap).toFixed(3)} puntos, unos ${formatter.format(Math.max(0, Math.round(voteGap)))} votos proyectados, para alcanzar el segundo lugar de ${second.name}.`;
+  }
+
+  const bestRegions = liveRegions
+    .map((region) => ({
+      name: region.name,
+      pct: Number(region[candidate.key] || 0),
+      votes: Number(region[`${candidate.key}_v`] || 0),
+    }))
+    .filter((region) => region.pct > 0 || region.votes > 0)
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 5);
+
+  const regionRows = bestRegions.length
+    ? bestRegions.map((region, index) => `
+        <div class="candidate-region-row">
+          <div>
+            <span class="candidate-region-rank">${index + 1}</span>
+            <strong>${escapeHtml(region.name)}</strong>
+          </div>
+          <small>${region.pct.toFixed(2)}% - ${formatter.format(Math.round(region.votes))} votos</small>
+          <div class="bar"><span style="width:${Math.min(region.pct, 100).toFixed(2)}%; background:${candidate.color}"></span></div>
+        </div>
+      `).join("")
+    : `<div class="candidate-popup-empty">Esperando datos regionales para este candidato.</div>`;
+
+  const voteDeltaText = `+${formatter.format(Math.round(voteDelta))} votos`;
+  const timestamp = latestSnapshotTimestamp ? `Actualizado ${formatTime(latestSnapshotTimestamp)}` : "Esperando refresh";
+
+  return `
+    <div class="candidate-popup" style="--candidate-color:${candidate.color}">
+      <div class="candidate-popup-head">
+        <div class="candidate-popup-person">
+          <span class="kpi-avatar kpi-avatar-fallback">${escapeHtml((candidate.short || candidate.name)[0])}</span>
+          <img class="kpi-avatar" src="${ONPE_IMG_BASE}${candidate.img}.jpg" alt="${escapeHtml(candidate.name)}" loading="lazy" onerror="this.style.display='none'; this.previousElementSibling.style.display='grid';" />
+          <div>
+            <span>Candidato</span>
+            <h2>${escapeHtml(candidate.name)}</h2>
+            <p>${rank || "-"}&deg; lugar proyectado - ${timestamp}</p>
+          </div>
+        </div>
+        <strong>#${rank || "-"}</strong>
+      </div>
+
+      <div class="candidate-popup-stats">
+        <article>
+          <span>ONPE</span>
+          <strong>${Number(candidate.onpe || 0).toFixed(3)}%</strong>
+          <small>${formatter.format(Math.round(countedVotes))} votos contabilizados</small>
+        </article>
+        <article>
+          <span>Proyeccion</span>
+          <strong>${projectedPct.toFixed(3)}%</strong>
+          <small>${formatter.format(Math.round(projectedVotes))} votos al 100%</small>
+        </article>
+        <article>
+          <span>Probabilidad de pase</span>
+          <strong>${candidate.probability || 0}%</strong>
+          <small>Segun brecha y avance</small>
+        </article>
+        <article>
+          <span>Ultimo cambio</span>
+          <strong>${escapeHtml(voteDeltaText)}</strong>
+          <small>Acumulado: +${formatter.format(Math.round(cumulativeVoteDelta))} votos desde la base</small>
+        </article>
+      </div>
+
+      <div class="candidate-popup-reading">
+        ${escapeHtml(reading)}
+      </div>
+
+      <div class="candidate-popup-regions">
+        <div class="candidate-popup-title">
+          <strong>Regiones donde esta mas fuerte</strong>
+          <span>Top 5 por porcentaje regional</span>
+        </div>
+        ${regionRows}
+      </div>
+    </div>
+  `;
+}
+
+function openCandidatePopup(candidateKey) {
+  const dialog = document.querySelector("#candidateDialog");
+  const content = document.querySelector("#candidateDialogContent");
+  if (!dialog || !content || !candidateKey) return;
+  selectedCandidateDialogKey = candidateKey;
+  content.innerHTML = getCandidatePopupHtml(candidateKey);
+  showDialog(dialog);
+}
+
+function updateCandidatePopup() {
+  const dialog = document.querySelector("#candidateDialog");
+  const content = document.querySelector("#candidateDialogContent");
+  if (!dialog?.open || !content || !selectedCandidateDialogKey) return;
+  content.innerHTML = getCandidatePopupHtml(selectedCandidateDialogKey);
+}
+
+function getRegionTooltipHtml(regionName) {
+  const region = getRegion(regionName);
+  if (!region) {
+    return `<strong>${escapeHtml(regionName)}</strong><span>Esperando datos regionales</span>`;
+  }
+
+  const { winner, runnerUp, gap } = getRegionSummary(region);
+  const focusedCandidate = getCandidate(selectedCandidateKey);
+  const focusedValue = focusedCandidate ? Number(region[focusedCandidate.key] || 0) : null;
+  const detail = focusedCandidate
+    ? `${focusedCandidate.name}: ${focusedValue.toFixed(2)}%`
+    : `Gana ${winner.name} por ${gap.toFixed(2)} pp sobre ${runnerUp.name}`;
+
+  return `
+    <strong>${escapeHtml(region.name)}</strong>
+    <span>${escapeHtml(detail)}</span>
+  `;
+}
+
+function moveMapTooltip(event) {
+  const root = document.querySelector("#peruMap");
+  const tooltip = document.querySelector("#mapTooltip");
+  if (!root || !tooltip) return;
+  const rect = root.getBoundingClientRect();
+  tooltip.style.setProperty("--tooltip-x", `${event.clientX - rect.left}px`);
+  tooltip.style.setProperty("--tooltip-y", `${event.clientY - rect.top}px`);
+}
+
+function showMapTooltip(regionName, event) {
+  const tooltip = document.querySelector("#mapTooltip");
+  if (!tooltip) return;
+  tooltip.innerHTML = getRegionTooltipHtml(regionName);
+  moveMapTooltip(event);
+  tooltip.classList.add("visible");
+}
+
+function hideMapTooltip() {
+  document.querySelector("#mapTooltip")?.classList.remove("visible");
+}
+
+function getAnalysisProjectionModel() {
+  return latestProjectionModel || buildVoteProjection(latestNationalPct, latestCountedVotes);
+}
+
+function getAnalysisRows() {
+  const model = getAnalysisProjectionModel();
+  const projectedTotal = Number(model.projectedValidVotes || 0);
+  return candidates
+    .map((candidate) => {
+      const projectedVotes = Number(candidate.projectedVotes || model.projectedByCandidate?.[candidate.key] || candidate.votes || 0);
+      const projectedPct = projectedTotal
+        ? (projectedVotes / projectedTotal) * 100
+        : Number(candidate.projected || candidate.onpe || 0);
+      return {
+        ...candidate,
+        currentVotes: Number(candidate.votes || 0),
+        projectedPct,
+        projectedVotes,
+        additionalVotes: Math.max(0, projectedVotes - Number(candidate.votes || 0)),
+      };
+    })
+    .sort((a, b) => b.projectedVotes - a.projectedVotes)
+    .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+}
+
+function getStrongRegions(candidateKey, limit = 3) {
+  return liveRegions
+    .map((region) => {
+      const pct = Number(region[candidateKey] || 0);
+      const directVotes = Number(region[`${candidateKey}_v`] || 0);
+      const validVotes = Number(region.vv || 0);
+      return {
+        name: region.name,
+        pct,
+        votes: directVotes || (validVotes ? (validVotes * pct) / 100 : 0),
+      };
+    })
+    .filter((region) => region.pct > 0 || region.votes > 0)
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, limit);
+}
+
+function getCompetitiveRegions(limit = 5) {
+  return liveRegions
+    .map((region) => {
+      const summary = getRegionSummary(region);
+      const totalActs = Number(region.totalActas || 0);
+      const countedActs = Number(region.contabilizadas || 0);
+      const pendingActs = Math.max(0, Number(region.pendientesJee ?? (totalActs - countedActs - Number(region.enviadasJee || 0))));
+      return {
+        ...summary,
+        name: region.name,
+        countedPct: Number(region.pct || 0),
+        pendingActs,
+        validVotes: Number(region.vv || 0),
+      };
+    })
+    .filter((region) => region.winner && region.runnerUp && Number.isFinite(region.gap))
+    .sort((a, b) => a.gap - b.gap)
+    .slice(0, limit);
+}
+
+function getCandidatePotentialRegions(candidateKey, limit = 4) {
+  return liveRegions
+    .map((region) => {
+      const progress = clampProgress(region.pct);
+      const validVotes = Number(region.vv || 0);
+      const candidatePct = Number(region[candidateKey] || 0);
+      const totalActs = Number(region.totalActas || 0);
+      const countedActs = Number(region.contabilizadas || 0);
+      const jeeActs = Number(region.enviadasJee || 0);
+      const pendingActs = Math.max(0, Number(region.pendientesJee ?? (totalActs - countedActs - jeeActs)));
+      const projectedRegionValidVotes = progress && validVotes
+        ? validVotes / progress
+        : validVotes;
+      const remainingValidVotes = Math.max(0, projectedRegionValidVotes - validVotes);
+      const potentialVotes = remainingValidVotes * (candidatePct / 100);
+
+      return {
+        name: region.name,
+        countedPct: Number(region.pct || 0),
+        candidatePct,
+        pendingActs,
+        potentialVotes,
+        remainingValidVotes,
+      };
+    })
+    .filter((region) => region.potentialVotes > 0 || region.pendingActs > 0)
+    .sort((a, b) => b.potentialVotes - a.potentialVotes)
+    .slice(0, limit);
+}
+
+function renderPublicSummary() {
+  const summary = document.querySelector("#publicSummary");
+  if (!summary) return;
+  const ranked = getAnalysisRows();
+  const leader = ranked[0];
+  const second = ranked[1];
+  const third = ranked[2];
+  if (!leader || !second || !third) return;
+  const secondGap = second.projectedPct - third.projectedPct;
+  const voteGap = Math.abs(second.projectedVotes - third.projectedVotes);
+  const remainingVotes = Number(getAnalysisProjectionModel().remainingValidVotes || latestEstimatedRemainingVotes || 0);
+  const raceTone = secondGap < 0.35
+    ? "muy cerrada"
+    : secondGap < 1
+      ? "cerrada"
+      : "con ventaja visible para el segundo lugar";
+  const timestamp = latestSnapshotTimestamp ? ` Actualizado ${formatTime(latestSnapshotTimestamp)}.` : "";
+  summary.textContent = `${leader.name} lidera la proyeccion con ${leader.projectedPct.toFixed(3)}%. La pelea publica esta en el pase a segunda vuelta: ${second.name} supera a ${third.name} por ${secondGap.toFixed(3)} puntos, aproximadamente ${formatter.format(Math.round(voteGap))} votos proyectados. Con ${formatter.format(Math.round(remainingVotes))} votos validos por estimar, la disputa se lee ${raceTone}.${timestamp}`;
+}
+
+function renderAnalysisDeepDive() {
+  const root = document.querySelector("#analysisDeepDive");
+  if (!root) return;
+  const rows = getAnalysisRows();
+  const model = getAnalysisProjectionModel();
+  const leader = rows[0];
+  const second = rows[1];
+  const third = rows[2];
+  const fourth = rows[3];
+  if (!leader || !second || !third) {
+    root.innerHTML = `<p class="empty-state">Esperando datos para construir el analisis.</p>`;
+    return;
+  }
+
+  const secondGapPct = second.projectedPct - third.projectedPct;
+  const secondGapVotes = second.projectedVotes - third.projectedVotes;
+  const fourthGapVotes = fourth ? second.projectedVotes - fourth.projectedVotes : 0;
+  const remainingVotes = Number(model.remainingValidVotes || latestEstimatedRemainingVotes || 0);
+  const countedPct = Number(latestNationalPct || 0);
+  const regionalMode = model.regionsUsed
+    ? `${model.regionsUsed} regiones incorporadas`
+    : "lectura nacional";
+  const pressure = secondGapVotes > 0 && remainingVotes > 0
+    ? (remainingVotes / secondGapVotes)
+    : 0;
+  const pressureText = pressure > 5
+    ? "la brecha todavia es vulnerable si las actas restantes llegan con sesgo regional"
+    : pressure > 2
+      ? "la brecha necesita vigilancia porque los votos restantes aun pesan"
+      : "la brecha es mas defendible con la informacion actual";
+
+  root.innerHTML = `
+    <article class="analysis-callout" style="--analysis-color:${second.color}">
+      <span>Clave del momento</span>
+      <strong>${escapeHtml(second.name)} defiende el segundo lugar frente a ${escapeHtml(third.name)}</strong>
+      <p>La diferencia proyectada es de ${secondGapPct.toFixed(3)} puntos, cerca de ${formatter.format(Math.round(Math.max(0, secondGapVotes)))} votos. ${pressureText}.</p>
+    </article>
+    <div class="analysis-metrics">
+      <article>
+        <span>Lider</span>
+        <strong>${escapeHtml(leader.name)}</strong>
+        <small>${leader.projectedPct.toFixed(3)}% - ${formatter.format(Math.round(leader.projectedVotes))} votos proy.</small>
+      </article>
+      <article>
+        <span>Pelea por pase</span>
+        <strong>${secondGapPct.toFixed(3)} pp</strong>
+        <small>${formatter.format(Math.round(Math.max(0, secondGapVotes)))} votos entre 2do y 3ro</small>
+      </article>
+      <article>
+        <span>Votos por estimar</span>
+        <strong>${formatter.format(Math.round(remainingVotes))}</strong>
+        <small>Avance ONPE ${countedPct.toFixed(3)}%</small>
+      </article>
+      <article>
+        <span>Base de proyeccion</span>
+        <strong>${escapeHtml(regionalMode)}</strong>
+        <small>${model.jeeActs ? `${formatter.format(model.jeeActs)} actas JEE ponderadas` : "Sin peso JEE nuevo"}</small>
+      </article>
+    </div>
+    <p class="analysis-note">La lectura no asume que todos los votos restantes se comportan igual: combina conteo actual, avance ONPE, actas pendientes/JEE y fuerza regional disponible. Si ${escapeHtml(third.name)} o ${fourth ? escapeHtml(fourth.name) : "otro candidato"} crece en regiones con actas pendientes, la brecha del segundo lugar puede comprimirse.</p>
+    ${fourth ? `<p class="analysis-note muted">${escapeHtml(fourth.name)} esta a ${formatter.format(Math.round(Math.max(0, fourthGapVotes)))} votos proyectados del segundo lugar.</p>` : ""}
+  `;
+}
+
+function renderRunoffAnalysis() {
+  const root = document.querySelector("#analysisRunoffCards");
+  if (!root) return;
+  const rows = getAnalysisRows();
+  const second = rows[1];
+  const targets = rows.slice(1, 5);
+  if (!second || !targets.length) {
+    root.innerHTML = `<p class="empty-state">Esperando datos de segunda vuelta.</p>`;
+    return;
+  }
+
+  root.innerHTML = targets.map((candidate) => {
+    const isSecond = candidate.key === second.key;
+    const voteGap = isSecond ? candidate.projectedVotes - Number(rows[2]?.projectedVotes || 0) : second.projectedVotes - candidate.projectedVotes;
+    const pctGap = isSecond ? candidate.projectedPct - Number(rows[2]?.projectedPct || 0) : second.projectedPct - candidate.projectedPct;
+    const label = isSecond ? "Dentro por ahora" : "Necesita recortar";
+    const detail = isSecond
+      ? `${formatter.format(Math.round(Math.max(0, voteGap)))} votos sobre el tercero`
+      : `${formatter.format(Math.round(Math.max(0, voteGap)))} votos para alcanzar el segundo`;
+
+    return `
+      <article class="analysis-race-card" data-analysis-candidate="${candidate.key}" tabindex="0" role="button" style="--candidate-color:${candidate.color}">
+        <div>
+          <span>${label}</span>
+          <strong>${escapeHtml(candidate.name)}</strong>
+        </div>
+        <b>${candidate.projectedPct.toFixed(3)}%</b>
+        <small>${detail} - ${Math.max(0, pctGap).toFixed(3)} pp</small>
+        <div class="bar"><span style="width:${Math.min(candidate.projectedPct * 4.6, 100).toFixed(2)}%; background:${candidate.color}"></span></div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderRegionalAnalysis() {
+  const root = document.querySelector("#analysisRegionalPulse");
+  if (!root) return;
+  const regions = getCompetitiveRegions(6);
+  if (!regions.length) {
+    root.innerHTML = `<p class="empty-state">Esperando regiones con datos suficientes.</p>`;
+    return;
+  }
+
+  root.innerHTML = regions.map((region) => `
+    <article class="analysis-region-card" data-region="${escapeHtml(region.name)}" tabindex="0" role="button" style="--winner-color:${region.winner.color}">
+      <div>
+        <strong>${escapeHtml(region.name)}</strong>
+        <span>${escapeHtml(region.winner.name)} vs ${escapeHtml(region.runnerUp.name)}</span>
+      </div>
+      <b>${region.gap.toFixed(2)} pp</b>
+      <small>${formatter.format(Math.round(region.voteGap))} votos de brecha - ${region.countedPct.toFixed(2)}% actas - ${formatter.format(region.pendingActs)} pendientes/JEE</small>
+    </article>
+  `).join("");
+}
+
+function renderCandidateAnalysisList() {
+  const root = document.querySelector("#analysisCandidateList");
+  if (!root) return;
+  const rows = getAnalysisRows();
+  if (!rows.length) {
+    root.innerHTML = `<p class="empty-state">Esperando candidatos.</p>`;
+    return;
+  }
+
+  root.innerHTML = rows.map((candidate) => {
+    const regions = getStrongRegions(candidate.key, 3);
+    const regionText = regions.length
+      ? regions.map((region) => `${region.name} ${region.pct.toFixed(1)}%`).join(" - ")
+      : "Regiones pendientes";
+    return `
+      <article class="analysis-candidate-row" data-analysis-candidate="${candidate.key}" tabindex="0" role="button" style="--candidate-color:${candidate.color}">
+        <div class="analysis-candidate-rank">#${candidate.rank}</div>
+        <div>
+          <strong>${escapeHtml(candidate.name)}</strong>
+          <span>ONPE ${Number(candidate.onpe || 0).toFixed(3)}% - Proy. ${candidate.projectedPct.toFixed(3)}% - ${candidate.probability || 0}% pase</span>
+          <small>Mas fuerte en: ${escapeHtml(regionText)}</small>
+        </div>
+        <b>${formatter.format(Math.round(candidate.projectedVotes))}</b>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderCandidatePotentialAnalysis() {
+  const root = document.querySelector("#analysisCandidatePotential");
+  if (!root) return;
+  const rows = getAnalysisRows();
+  if (!rows.length) {
+    root.innerHTML = `<p class="empty-state">Esperando datos regionales.</p>`;
+    return;
+  }
+
+  root.innerHTML = rows.map((candidate) => {
+    const regions = getCandidatePotentialRegions(candidate.key, 4);
+    const totalPotential = regions.reduce((sum, region) => sum + region.potentialVotes, 0);
+    const maxPotential = Math.max(1, ...regions.map((region) => region.potentialVotes));
+    const regionRows = regions.length
+      ? regions.map((region) => `
+          <button class="analysis-potential-region" type="button" data-region="${escapeHtml(region.name)}">
+            <div>
+              <strong>${escapeHtml(region.name)}</strong>
+              <span>${region.candidatePct.toFixed(2)}% actual - ${region.countedPct.toFixed(2)}% actas</span>
+            </div>
+            <b>+${formatter.format(Math.round(region.potentialVotes))}</b>
+            <small>${formatter.format(Math.round(region.remainingValidVotes))} votos validos por estimar en la region</small>
+            <div class="bar"><span style="width:${Math.min(100, (region.potentialVotes / maxPotential) * 100).toFixed(2)}%; background:${candidate.color}"></span></div>
+          </button>
+        `).join("")
+      : `<p class="empty-state">Sin regiones pendientes suficientes para estimar.</p>`;
+
+    return `
+      <article class="analysis-potential-card" style="--candidate-color:${candidate.color}">
+        <button class="analysis-potential-head" type="button" data-analysis-candidate="${candidate.key}">
+          <div>
+            <span>#${candidate.rank} proy.</span>
+            <strong>${escapeHtml(candidate.name)}</strong>
+          </div>
+          <b>+${formatter.format(Math.round(totalPotential))}</b>
+        </button>
+        <p>Mayor oportunidad de sumar segun su porcentaje actual en regiones con actas por cerrar.</p>
+        <div class="analysis-potential-regions">
+          ${regionRows}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderAnalysisPanel() {
+  renderPublicSummary();
+  renderAnalysisDeepDive();
+  renderRegionalAnalysis();
+  renderCandidatePotentialAnalysis();
+}
+
+function renderSelectedCandidatePanel() {
+  const panel = document.querySelector("#selectedCandidatePanel");
+  if (!panel) return;
+  panel.innerHTML = "";
+}
+
+function renderInteractivePanels() {
+  renderAnalysisPanel();
+  renderSelectedCandidatePanel();
+  renderRegionOptions();
+  renderRegionPanel();
+  updateCandidatePopup();
+}
+
+function applySnapshot(snapshot, previousVoteBase = null) {
+  const national = snapshot.national;
+  latestSnapshotTimestamp = national.fechaActualizacion || snapshot.timestamp || Date.now();
+  const candidateData = national.candidates || {};
+  const previousVotes = new Map(candidates.map((candidate) => [candidate.key, Number(candidate.votes || 0)]));
+  const storedCandidateVotes = previousVoteBase?.candidateVotes || null;
+  const hasStoredCandidateBase = Boolean(storedCandidateVotes);
+  candidates.forEach((candidate) => {
+    candidate.onpe = Number(candidateData[candidate.key] || candidate.onpe);
+    candidate.projected = Number(
+      candidateData[`${candidate.key}_proy`] ??
+        candidateData[`${candidate.key}_projected`] ??
+        national.projected?.[candidate.key] ??
+        national.projections?.[candidate.key] ??
+        candidate.projected ??
+        candidate.onpe
+    );
+    const nextVotes = Number(candidateData[`${candidate.key}_v`] || national.candidateVotes?.[candidate.key] || candidate.votes);
+    const previous = hasStoredCandidateBase
+      ? Number(storedCandidateVotes[candidate.key] || 0)
+      : previousVotes.get(candidate.key) || 0;
+    const delta = (hasStoredCandidateBase || hasVoteDeltaBaseline)
+      ? Math.max(0, nextVotes - previous)
+      : 0;
+    candidate.votes = nextVotes;
+    candidate.voteDelta = delta;
+    candidate.lastVoteDelta = delta;
+  });
+  hasVoteDeltaBaseline = true;
+
+  if (voteDeltaClearTimer) {
+    clearTimeout(voteDeltaClearTimer);
+  }
+  if (candidates.some((candidate) => Number(candidate.voteDelta || 0) > 0)) {
+    voteDeltaClearTimer = window.setTimeout(() => {
+      candidates.forEach((candidate) => {
+        candidate.voteDelta = 0;
+      });
+      renderCandidateCards();
+      voteDeltaClearTimer = null;
+    }, 9000);
+  }
+
+  liveRegions = snapshot.regions || liveRegions;
+  const nationalValidVotes = national.votosValidos || 0;
+  latestProjectionModel = buildVoteProjection(national.pct, nationalValidVotes, national);
+  candidates.forEach((candidate) => {
+    const projectedVotes = latestProjectionModel.projectedByCandidate[candidate.key];
+    if (Number.isFinite(projectedVotes) && projectedVotes > 0) {
+      candidate.projectedVotes = projectedVotes;
+      candidate.projected = latestProjectionModel.projectedValidVotes
+        ? (projectedVotes / latestProjectionModel.projectedValidVotes) * 100
+        : candidate.projected;
+    }
+  });
+
+  candidates.sort((a, b) => b.projected - a.projected);
+  assignPassProbabilities(national.pct);
+
+  const pending = Math.max(
+    0,
+    Number(
+      national.pendientesJee ??
+        ((national.totalActas || 0) - (national.contabilizadas || 0) - (national.enviadasJee || 0))
+    )
+  );
+  const countedVotes = national.votosEmitidos || national.votosValidos || 0;
+  const estimatedRemaining = national.pct ? countedVotes * (100 - national.pct) / national.pct : 0;
+  latestNationalPct = Number(national.pct || latestNationalPct || 0);
+  latestCountedVotes = Number(nationalValidVotes || countedVotes || latestCountedVotes || 0);
+  latestEstimatedRemainingVotes = Number(latestProjectionModel.remainingValidVotes || estimatedRemaining || 0);
+
+  animateTotalPercentage(Number(national.pct || 0));
+  document.querySelector("#lastUpdate").textContent = formatTime(national.fechaActualizacion || snapshot.timestamp);
+  document.querySelector("#pendingActs").textContent = formatter.format(pending);
+  document.querySelector("#challengedActs").textContent = formatter.format(national.enviadasJee || 0);
+  document.querySelector("#countedVotes").textContent = formatter.format(Math.round(countedVotes));
+  document.querySelector("#remainingVotes").textContent = formatter.format(Math.round(latestEstimatedRemainingVotes));
+
+  renderProbabilities();
+  renderTotalVotesPrediction();
+  renderCandidateCards();
+  renderMap();
+  renderTable();
+  renderSources();
+  renderInteractivePanels();
+}
+
+async function refreshTracking() {
+  const response = await fetch(`${WORKER_URL}/api/tracking?refresh=${Date.now()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Tracking HTTP ${response.status}`);
+  const data = await response.json();
+  const cuts = (data.cuts || []).slice(-24);
+  if (!cuts.length) return;
+  trends = candidates.map((candidate) => {
+    return cuts.map((cut) => Number(cut[candidate.trackingKey] || candidate.onpe));
+  });
+  renderChart();
+}
+
+async function refreshDashboard() {
+  const button = document.querySelector("#refreshBtn");
+  const note = document.querySelector("#chartNote");
+  const refreshStartedAt = performance.now();
+  button.disabled = true;
+  button.textContent = "Actualizando...";
+  refreshHealthState = {
+    ...refreshHealthState,
+    state: "loading",
+    startedAt: Date.now(),
+    dataChanged: null,
+    voteDeltaTotal: 0,
+    cumulativeVoteDelta: Number(refreshHealthState.cumulativeVoteDelta || readStoredVoteBase()?.cumulativeVoteDelta || 0),
+    error: "",
+  };
+  renderRefreshHealth();
+  if (hasAnimatedTotal) {
+    forceTotalFromZero = true;
+  }
+  setStatus("Consultando ONPE...", "status-ok");
+  if (note) note.textContent = "Consultando datos publicos del dashboard de referencia...";
+  const refreshToken = Date.now();
+  const congressRefresh = refreshCongressDashboard({ silent: true });
+  try {
+    const [half1, half2] = await Promise.all([
+      fetch(`${WORKER_URL}/api/snapshot?half=1&refresh=${refreshToken}`, {
+        cache: "no-store",
+      }).then((response) => {
+        if (!response.ok) throw new Error(`Snapshot 1 HTTP ${response.status}`);
+        return response.json();
+      }),
+      fetch(`${WORKER_URL}/api/snapshot?half=2&refresh=${refreshToken}`, {
+        cache: "no-store",
+      }).then((response) => {
+        if (!response.ok) throw new Error(`Snapshot 2 HTTP ${response.status}`);
+        return response.json();
+      }),
+    ]);
+    const snapshot = {
+      ...half1,
+      regions: [...(half1.regions || []), ...(half2.regions || [])],
+    };
+    const signature = buildSnapshotSignature(snapshot);
+    const storedVoteBase = readStoredVoteBase();
+    const previousSignature = refreshHealthState.signature || storedVoteBase?.signature || "";
+    const dataChanged = previousSignature ? previousSignature !== signature : true;
+    const currentVoteBase = getSnapshotVoteBase(snapshot, signature);
+    const totalCountedVotesFromSnapshot = Number(currentVoteBase.totalCountedVotes || 0);
+    const previousTotalCountedVotes = Number(
+      storedVoteBase?.totalCountedVotes ||
+        refreshHealthState.totalCountedVotes ||
+        0
+    );
+    const hadVoteBaseline = previousTotalCountedVotes > 0;
+    const totalCountedVotes = totalCountedVotesFromSnapshot || previousTotalCountedVotes;
+    applySnapshot(snapshot, storedVoteBase);
+    const voteDeltaTotal = hadVoteBaseline && totalCountedVotesFromSnapshot
+      ? Math.max(0, totalCountedVotes - previousTotalCountedVotes)
+      : 0;
+    const cumulativeVoteDelta = Number(storedVoteBase?.cumulativeVoteDelta || 0) + voteDeltaTotal;
+    const cumulativeCandidateDeltas = {};
+    candidates.forEach((candidate) => {
+      const cumulative = Number(storedVoteBase?.cumulativeCandidateDeltas?.[candidate.key] || 0) + Number(candidate.lastVoteDelta || 0);
+      candidate.cumulativeVoteDelta = cumulative;
+      cumulativeCandidateDeltas[candidate.key] = cumulative;
+    });
+    currentVoteBase.cumulativeVoteDelta = cumulativeVoteDelta;
+    currentVoteBase.cumulativeCandidateDeltas = cumulativeCandidateDeltas;
+    refreshHealthState = {
+      ...refreshHealthState,
+      state: "ok",
+      completedAt: Date.now(),
+      durationMs: performance.now() - refreshStartedAt,
+      dataTimestamp: latestSnapshotTimestamp || snapshot.timestamp || Date.now(),
+      dataChanged,
+      voteDeltaTotal,
+      cumulativeVoteDelta,
+      totalCountedVotes,
+      hadVoteBaseline,
+      signature,
+      error: "",
+    };
+    writeStoredVoteBase(currentVoteBase);
+    renderProbabilities();
+    renderRefreshHealth();
+    if (document.querySelector("#trendChart")) {
+      await refreshTracking();
+    }
+    await congressRefresh;
+    setStatus(`Actualizado ${formatTime(Date.now())}`, "status-ok");
+    if (note) note.textContent = `Datos actualizados desde el Worker publico: ${formatTime(snapshot.timestamp)}.`;
+  } catch (error) {
+    console.error(error);
+    refreshHealthState = {
+      ...refreshHealthState,
+      state: "error",
+      completedAt: Date.now(),
+      durationMs: performance.now() - refreshStartedAt,
+      voteDeltaTotal: 0,
+      cumulativeVoteDelta: Number(refreshHealthState.cumulativeVoteDelta || readStoredVoteBase()?.cumulativeVoteDelta || 0),
+      error: error.message || "No se pudo actualizar",
+    };
+    renderRefreshHealth();
+    setStatus("No se pudo actualizar", "status-error");
+    if (note) note.textContent = "No se pudo consultar el Worker. Se mantienen los ultimos datos visibles.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Actualizar";
+  }
+}
+
+function bindDialogs() {
+  const shareDialog = document.querySelector("#shareDialog");
+  const donateDialog = document.querySelector("#donateDialog");
+  const regionDialog = document.querySelector("#regionDialog");
+  const candidateDialog = document.querySelector("#candidateDialog");
+  const senatorDialog = document.querySelector("#senatorDialog");
+  document.querySelector("#shareBtn").addEventListener("click", () => showDialog(shareDialog));
+  document.querySelector("#donateBtn").addEventListener("click", () => showDialog(donateDialog));
+  document.querySelectorAll("[data-close]").forEach((button) => {
+    button.addEventListener("click", () => closeDialog(document.querySelector(`#${button.dataset.close}`)));
+  });
+  [shareDialog, donateDialog, regionDialog, candidateDialog, senatorDialog].forEach((dialog) => {
+    dialog?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeDialog(dialog);
+    });
+  });
+  document.querySelector("#copyBtn").addEventListener("click", async () => {
+    const text = `${getShareText()}\n${getShareUrl()}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      document.querySelector("#copyBtn").textContent = "Resumen copiado";
+    } catch {
+      document.querySelector("#copyBtn").textContent = "Copia no disponible";
+    }
+  });
+  const shareText = () => encodeURIComponent(getShareText());
+  const shareUrl = () => encodeURIComponent(getShareUrl());
+  document.querySelector("#shareWhatsApp")?.addEventListener("click", () => {
+    openShareWindow(`https://wa.me/?text=${shareText()}%0A${shareUrl()}`);
+  });
+  document.querySelector("#shareX")?.addEventListener("click", () => {
+    openShareWindow(`https://twitter.com/intent/tweet?text=${shareText()}&url=${shareUrl()}`);
+  });
+  document.querySelector("#shareFacebook")?.addEventListener("click", () => {
+    openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl()}`);
+  });
+  document.querySelector("#shareTelegram")?.addEventListener("click", () => {
+    openShareWindow(`https://t.me/share/url?url=${shareUrl()}&text=${shareText()}`);
+  });
+}
+
+function bindTabs() {
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tab || "onpe";
+      document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.tabPanel === target);
+      });
+      if (target === "datum") {
+        renderCongressDashboard();
+        refreshCongressDashboard({ silent: true });
+      } else if (target === "analysis") {
+        renderAnalysisPanel();
+      }
+    });
+  });
+  document.querySelector("#refreshCongressBtn")?.addEventListener("click", () => {
+    refreshCongressDashboard();
+  });
+}
+
+function bindCongressInteractions() {
+  const congressPanel = document.querySelector('[data-tab-panel="datum"]');
+  congressPanel?.addEventListener("click", (event) => {
+    const party = event.target.closest("[data-congress-party]");
+    if (!party) return;
+    openSenatorPopup(party.dataset.congressParty);
+  });
+  congressPanel?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const party = event.target.closest("[data-congress-party]");
+    if (!party) return;
+    event.preventDefault();
+    openSenatorPopup(party.dataset.congressParty);
+  });
+}
+
+function bindPublicInteractions() {
+  const candidateCards = document.querySelector("#candidateCards");
+  candidateCards?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-candidate]");
+    if (!card) return;
+    selectedCandidateKey = card.dataset.candidate;
+    renderCandidateCards();
+    renderMap();
+    renderChart();
+    renderSelectedCandidatePanel();
+    openCandidatePopup(card.dataset.candidate);
+  });
+  candidateCards?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target.closest("[data-candidate]");
+    if (!card) return;
+    event.preventDefault();
+    card.click();
+  });
+
+  const analysisPanel = document.querySelector('[data-tab-panel="analysis"]');
+  analysisPanel?.addEventListener("click", (event) => {
+    const candidateRow = event.target.closest("[data-analysis-candidate]");
+    if (candidateRow) {
+      selectedCandidateKey = candidateRow.dataset.analysisCandidate;
+      renderCandidateCards();
+      renderMap();
+      renderChart();
+      openCandidatePopup(selectedCandidateKey);
+      return;
+    }
+
+    const regionRow = event.target.closest("[data-region]");
+    if (regionRow) {
+      selectedRegionName = regionRow.dataset.region;
+      renderMap();
+      renderRegionPanel();
+      openRegionPopup(selectedRegionName);
+    }
+  });
+  analysisPanel?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const item = event.target.closest("[data-analysis-candidate], [data-region]");
+    if (!item) return;
+    event.preventDefault();
+    item.click();
+  });
+
+  const peruMap = document.querySelector("#peruMap");
+  peruMap?.addEventListener("click", (event) => {
+    const mapCandidate = event.target.closest("[data-map-candidate]");
+    if (mapCandidate) {
+      selectedCandidateKey = mapCandidate.dataset.mapCandidate === "winner" ? null : mapCandidate.dataset.mapCandidate;
+      renderCandidateCards();
+      renderMap();
+      renderChart();
+      renderSelectedCandidatePanel();
+      return;
+    }
+
+    const tile = event.target.closest("[data-region]");
+    if (!tile) return;
+    hideMapTooltip();
+    selectedRegionName = tile.dataset.region;
+    const search = document.querySelector("#regionSearch");
+    if (search) search.value = "";
+    renderRegionOptions();
+    renderMap();
+    renderRegionPanel();
+    openRegionPopup(selectedRegionName);
+  });
+  peruMap?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const tile = event.target.closest("[data-region]");
+    if (!tile) return;
+    event.preventDefault();
+    tile.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  peruMap?.addEventListener("pointerover", (event) => {
+    const tile = event.target.closest("[data-region]");
+    if (!tile) return;
+    showMapTooltip(tile.dataset.region, event);
+  });
+  peruMap?.addEventListener("pointermove", (event) => {
+    const tile = event.target.closest("[data-region]");
+    if (!tile) return;
+    moveMapTooltip(event);
+  });
+  peruMap?.addEventListener("pointerout", (event) => {
+    const tile = event.target.closest("[data-region]");
+    if (!tile) return;
+    if (!event.relatedTarget || !tile.contains(event.relatedTarget)) {
+      hideMapTooltip();
+    }
+  });
+
+  document.querySelector("#regionSearch")?.addEventListener("input", () => {
+    renderRegionOptions();
+  });
+
+  document.querySelector("#regionSelect")?.addEventListener("change", (event) => {
+    selectedRegionName = event.target.value;
+    renderMap();
+    renderRegionPanel();
+  });
+
+  document.querySelector("#resetFocus")?.addEventListener("click", () => {
+    selectedCandidateKey = null;
+    selectedCandidateDialogKey = "";
+    selectedRegionName = "";
+    const search = document.querySelector("#regionSearch");
+    if (search) search.value = "";
+    renderCandidateCards();
+    renderMap();
+    renderChart();
+    renderInteractivePanels();
+    closeDialog(document.querySelector("#candidateDialog"));
+  });
+
+  document.querySelector("#regionDialogContent")?.addEventListener("click", (event) => {
+    const focusButton = event.target.closest("[data-region-focus]");
+    if (!focusButton) return;
+    selectedCandidateKey = focusButton.dataset.regionFocus;
+    renderCandidateCards();
+    renderMap();
+    renderChart();
+    renderSelectedCandidatePanel();
+    closeDialog(document.querySelector("#regionDialog"));
+  });
+}
+
+function startCountdown() {
+  let seconds = 300;
+  setInterval(() => {
+    seconds -= 1;
+    if (seconds <= 0) {
+      seconds = 300;
+      refreshDashboard();
+    }
+    const min = Math.floor(seconds / 60);
+    const sec = String(seconds % 60).padStart(2, "0");
+    document.querySelector("#countdown").textContent = `${min}:${sec}`;
+    renderRefreshHealth();
+  }, 1000);
+}
+
+assignPassProbabilities(Number.parseFloat(document.querySelector("#counted")?.textContent) || 0);
+renderProbabilities();
+renderTotalVotesPrediction();
+renderCandidateCards();
+renderMap();
+renderTable();
+renderSources();
+renderChart();
+renderRefreshHealth();
+renderCongressDashboard();
+refreshCongressDashboard();
+bindDialogs();
+bindTabs();
+bindCongressInteractions();
+bindPublicInteractions();
+renderInteractivePanels();
+refreshDashboard();
+startCountdown();
+document.querySelector("#refreshBtn").addEventListener("click", refreshDashboard);
